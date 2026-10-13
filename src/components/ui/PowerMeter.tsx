@@ -13,9 +13,9 @@ export const PowerMeter: React.FC = () => {
   const percentage = drag.percentage;
 
   // Dynamic gradient color based on power
-  let barColor = 'from-emerald-500 to-teal-400';
+  let barColor = 'from-emerald-400 to-amber-300';
   if (percentage > 70) {
-    barColor = 'from-amber-500 to-rose-500';
+    barColor = 'from-amber-400 to-orange-500';
   } else if (percentage > 40) {
     barColor = 'from-emerald-400 to-amber-400';
   }
@@ -25,27 +25,27 @@ export const PowerMeter: React.FC = () => {
   return (
     <div
       data-testid="hud-power-meter"
-      className="absolute bottom-28 left-1/2 -translate-x-1/2 w-80 max-w-[90vw] bg-neutral-900/80 backdrop-blur-md border border-neutral-700/60 rounded-2xl p-3 shadow-2xl flex flex-col gap-1.5 transition-all animate-fade-in pointer-events-none"
+      className="absolute bottom-28 left-1/2 -translate-x-1/2 w-80 max-w-[90vw] timbul-card p-3.5 flex flex-col gap-2 transition-all animate-fade-in pointer-events-none"
     >
-      <div className="flex items-center justify-between text-xs font-semibold tracking-wider text-neutral-300">
-        <span className="flex items-center gap-1.5 text-amber-400">
-          <Zap className="w-4 h-4 fill-amber-400" />
-          DAYA SENTILAN
+      <div className="flex items-center justify-between text-xs font-black tracking-wider text-stone-700">
+        <span className="flex items-center gap-1.5 text-[#d54425]">
+          <Zap className="w-4 h-4 fill-[#ff6242] text-[#d54425]" />
+          TENAGA SENTIL 👆
         </span>
-        <span className="font-mono text-neutral-100 font-bold">{percentage}%</span>
+        <span className="font-mono text-stone-900 font-black">{percentage}%</span>
       </div>
 
-      <div className="w-full h-3 bg-neutral-800 rounded-full overflow-hidden border border-neutral-700/50 p-0.5">
+      <div className="w-full h-3.5 bg-[#ede6dc] rounded-full overflow-hidden border border-[#ded5c7] p-0.5 shadow-inner">
         <div
           data-testid="hud-power-meter-fill"
-          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-75`}
+          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-75 shadow-sm`}
           style={{ width: `${percentage}%` }}
         />
       </div>
 
-      <div className="flex justify-between text-[10px] text-neutral-400 px-1 font-mono">
-        <span>JANGKAUAN: ~{reachDistance}m</span>
-        <span>LEPAS UNTUK TEMBAK</span>
+      <div className="flex justify-between text-[11px] text-stone-500 px-1 font-bold">
+        <span>Jangkauan: ~{reachDistance}m</span>
+        <span>Lepas buat nyentil! ✨</span>
       </div>
     </div>
   );

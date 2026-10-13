@@ -5,7 +5,14 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['"DM Sans"', 'sans-serif'],
+        display: ['"Fredoka"', 'cursive', 'sans-serif'],
+        heading: ['"Fredoka"', 'cursive', 'sans-serif'],
+        mono: ['"Space Grotesk"', 'monospace'],
+      },
+    },
   },
   plugins: [],
 }

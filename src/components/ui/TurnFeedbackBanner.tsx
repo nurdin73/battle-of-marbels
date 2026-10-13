@@ -20,22 +20,22 @@ export const TurnFeedbackBanner: React.FC = () => {
 
   const { resultType, message } = lastTurnOutcome;
 
-  let bgStyles = 'bg-neutral-900/90 border-neutral-700 text-neutral-200';
+  let bgStyles = 'timbul-card';
   let IconComponent = CheckCircle2;
-  let title = 'HASIL SENTILAN';
+  let title = '✨ HASIL SENTILAN';
 
   if (resultType === 'COMBO_EXTRA_TURN') {
-    bgStyles = 'bg-gradient-to-r from-amber-950/90 to-emerald-950/90 border-amber-500/80 text-amber-200 ring-2 ring-amber-500/30';
+    bgStyles = 'bg-amber-50 border-2 border-amber-300 border-b-[5px] border-b-amber-500 text-amber-950 shadow-md';
     IconComponent = Flame;
-    title = '🔥 KOMBO SENTILAN!';
+    title = '💥 JOSS GANDOS! GILIRAN BONUS!';
   } else if (resultType === 'FOUL_OUT_OF_BOUNDS') {
-    bgStyles = 'bg-red-950/90 border-red-500/80 text-red-200 ring-2 ring-red-500/30';
+    bgStyles = 'bg-[#fff8f5] border-2 border-[#ff6242] border-b-[5px] border-b-[#d54425] text-stone-900 shadow-md';
     IconComponent = AlertOctagon;
-    title = '⚠️ PELANGGARAN (FOUL)';
+    title = '🙈 ADUH, KELUAR GARIS!';
   } else if (resultType === 'TIMEOUT') {
-    bgStyles = 'bg-orange-950/90 border-orange-500/80 text-orange-200 ring-2 ring-orange-500/30';
+    bgStyles = 'bg-orange-50 border-2 border-orange-300 border-b-[5px] border-b-orange-400 text-orange-950 shadow-md';
     IconComponent = Clock;
-    title = '⏱️ WAKTU HABIS';
+    title = '⏳ WADUH, KELAMAAN BENGONG!';
   }
 
   return (

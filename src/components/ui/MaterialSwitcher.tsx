@@ -6,8 +6,8 @@ import { Sparkles, Shield, CircleDot } from 'lucide-react';
 interface MaterialOption {
   type: MarbleMaterialType;
   name: string;
+  tagline: string;
   weight: string;
-  restitution: string;
   icon: React.ReactNode;
 }
 
@@ -15,23 +15,23 @@ const MATERIALS: MaterialOption[] = [
   {
     type: 'GLASS_CLASSIC',
     name: 'Kaca',
+    tagline: 'Lincah Mantul',
     weight: '20g',
-    restitution: '78%',
-    icon: <Sparkles className="w-4 h-4 text-sky-400" />,
+    icon: <Sparkles className="w-4 h-4 text-sky-700" />,
   },
   {
     type: 'MARBLE_STONE',
-    name: 'Batu',
+    name: 'Batu Kali',
+    tagline: 'Mantap Berbobot',
     weight: '38g',
-    restitution: '62%',
-    icon: <Shield className="w-4 h-4 text-emerald-400" />,
+    icon: <Shield className="w-4 h-4 text-emerald-700" />,
   },
   {
     type: 'BEARING_STEEL',
     name: 'Gotri Besi',
+    tagline: 'Keras Menabrak',
     weight: '55g',
-    restitution: '50%',
-    icon: <CircleDot className="w-4 h-4 text-amber-400" />,
+    icon: <CircleDot className="w-4 h-4 text-stone-700" />,
   },
 ];
 
@@ -45,13 +45,14 @@ export const MaterialSwitcher: React.FC = () => {
   return (
     <div
       data-testid="hud-material-switcher"
-      className="bg-neutral-900/80 backdrop-blur-md border border-neutral-700/60 rounded-2xl p-2 shadow-xl flex items-center gap-1.5"
+      className="timbul-card p-3.5 flex flex-col gap-2.5 w-full"
     >
-      <div className="hidden sm:block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider px-2">
-        Gacoan:
+      <div className="text-[11px] font-black text-stone-600 uppercase tracking-wider px-1 flex items-center justify-between">
+        <span>Kelereng Jagoan:</span>
+        <span className="text-[10px] text-stone-400 font-bold normal-case">Pilih jenis untuk sentilan</span>
       </div>
 
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {MATERIALS.map((mat) => {
           const isActive = gacoanMaterial === mat.type;
           return (
@@ -60,17 +61,17 @@ export const MaterialSwitcher: React.FC = () => {
               data-testid={`material-btn-${mat.type.toLowerCase()}`}
               disabled={disabled}
               onClick={() => setGacoanMaterial(mat.type)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all w-full ${
                 isActive
-                  ? 'bg-neutral-800 border border-sky-500/60 text-neutral-100 shadow-md ring-1 ring-sky-500/30'
-                  : 'bg-neutral-800/40 border border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/70'
+                  ? 'bg-[#fff8f5] border-2 border-[#ff6242] border-b-[4px] border-b-[#d54425] text-stone-900 shadow-sm font-black ring-1 ring-orange-200'
+                  : 'bg-white hover:bg-[#faf7f2] border-2 border-[#eee6dc] border-b-[3px] border-b-[#ded4c5] text-stone-600 font-bold active:translate-y-[1px] active:border-b-[2px]'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               {mat.icon}
               <div className="flex flex-col text-left">
-                <span className="font-semibold">{mat.name}</span>
-                <span className="text-[10px] text-neutral-400 font-mono">
-                  {mat.weight} • e={mat.restitution}
+                <span className="font-extrabold leading-tight">{mat.name}</span>
+                <span className="text-[10px] text-stone-500 font-semibold">
+                  {mat.tagline} ({mat.weight})
                 </span>
               </div>
             </button>

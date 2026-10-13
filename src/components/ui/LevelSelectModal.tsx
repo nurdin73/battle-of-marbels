@@ -29,35 +29,35 @@ export const LevelSelectModal: React.FC = () => {
   return (
     <div
       data-testid="level-select-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="relative w-full max-w-2xl bg-[#fdfbf7] border-2 border-[#eee6dc] border-b-[6px] border-b-[#ded4c5] rounded-[32px] p-6 sm:p-8 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-stone-800">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-4 mb-5">
+        <div className="flex items-center justify-between border-b-2 border-[#eee6dc] pb-4 mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center shadow-md shadow-amber-500/20 text-neutral-950 font-bold">
-              <Compass className="w-5 h-5 text-neutral-950" />
+            <div className="w-11 h-11 rounded-2xl bg-amber-100 border-2 border-amber-300 border-b-[3px] border-b-amber-400 flex items-center justify-center shadow-sm text-amber-900 font-bold">
+              <Compass className="w-5 h-5 text-amber-800" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-neutral-100 tracking-tight flex items-center gap-2">
-                MODE PETUALANGAN SOLO
+              <h2 className="text-base sm:text-lg font-black text-stone-800 tracking-tight flex items-center gap-2">
+                PETUALANGAN KELERENG KAMPUNG 🏡
               </h2>
-              <p className="text-xs text-neutral-400">Pilih rintangan pekarangan & capai bintang 3 Par</p>
+              <p className="text-xs text-stone-500 font-semibold">Pilih rintangan seru di pekarangan & kumpulkan bintang!</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Total Star Counter Pill */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs font-bold">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            {/* Total Star Counter Pill (Timbul) */}
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl bg-amber-100 border-2 border-amber-300 border-b-[3px] border-b-amber-400 text-amber-950 font-mono text-xs font-black">
+              <Star className="w-4 h-4 fill-amber-500 text-amber-600" />
               <span>{totalStars} / {maxPossibleStars}</span>
             </div>
 
-            {/* Close Button */}
+            {/* Close Button (Timbul cream circle) */}
             <button
               data-testid="close-level-select-btn"
               onClick={closeLevelSelectModal}
-              className="p-2 rounded-xl text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition-colors"
+              className="w-10 h-10 rounded-2xl border-2 border-[#eee6dc] border-b-[3px] border-b-[#ded4c5] bg-white hover:bg-stone-100 flex items-center justify-center text-stone-500 hover:text-stone-800 active:translate-y-[1px] transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -72,58 +72,58 @@ export const LevelSelectModal: React.FC = () => {
             const record = levelRecords[level.id];
             const stars = record ? record.stars : 0;
 
-            let difficultyColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+            let difficultyBadge = 'bg-emerald-50 text-emerald-900 border-2 border-emerald-300 border-b-[2px] border-b-emerald-400';
             if (level.difficulty === 'SEDANG') {
-              difficultyColor = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+              difficultyBadge = 'bg-amber-50 text-amber-950 border-2 border-amber-300 border-b-[2px] border-b-amber-400';
             } else if (level.difficulty === 'SULIT') {
-              difficultyColor = 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+              difficultyBadge = 'bg-orange-50 text-orange-950 border-2 border-orange-300 border-b-[2px] border-b-orange-400';
             }
 
             return (
               <div
                 key={level.id}
                 data-testid={`level-card-${level.id}`}
-                className={`relative flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl border transition-all ${
+                className={`relative flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl border-2 transition-all ${
                   isCurrent
-                    ? 'bg-neutral-800/90 border-sky-500/70 shadow-lg shadow-sky-500/10'
+                    ? 'bg-[#fff8f5] border-[#ff6242] border-b-[5px] border-b-[#d54425] shadow-md'
                     : isUnlocked
-                    ? 'bg-neutral-900/90 border-neutral-800 hover:border-neutral-700'
-                    : 'bg-neutral-950/60 border-neutral-900 opacity-60'
+                    ? 'bg-white hover:bg-[#faf7f2] border-[#eee6dc] border-b-[5px] border-b-[#ded4c5] shadow-sm'
+                    : 'bg-[#f7f4ee] border-[#eee6dc] border-b-[4px] border-b-[#ded4c5] opacity-60'
                 }`}
               >
                 {/* Level Meta & Info */}
                 <div className="flex items-start gap-3.5 mb-3 sm:mb-0">
                   <div
-                    className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 shadow-inner ${
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 shadow-sm ${
                       isCurrent
-                        ? 'bg-gradient-to-tr from-sky-500 to-indigo-600 text-white'
+                        ? 'bg-[#ff6242] border-b-[3px] border-b-[#d54425] text-white'
                         : isUnlocked
-                        ? 'bg-neutral-800 text-neutral-200 border border-neutral-700'
-                        : 'bg-neutral-900 text-neutral-600 border border-neutral-800'
+                        ? 'bg-[#fdfbf7] text-stone-800 border-2 border-[#eee6dc] border-b-[3px] border-b-[#ded4c5]'
+                        : 'bg-stone-200 text-stone-400 border-2 border-stone-300'
                     }`}
                   >
-                    {isUnlocked ? level.levelNumber : <Lock className="w-4 h-4 text-neutral-500" />}
+                    {isUnlocked ? level.levelNumber : <Lock className="w-4 h-4 text-stone-400" />}
                   </div>
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-neutral-100">{level.title}</h3>
-                      <span className={`px-2 py-0.5 rounded-md border text-[9px] font-bold ${difficultyColor}`}>
+                      <h3 className="text-sm font-black text-stone-800">{level.title}</h3>
+                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black ${difficultyBadge}`}>
                         {level.difficulty}
                       </span>
                       {record?.completed && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       )}
                     </div>
-                    <p className="text-xs text-sky-400/90 font-medium">{level.subtitle}</p>
-                    <p className="text-[11px] text-neutral-400 mt-1 max-w-md line-clamp-1">
+                    <p className="text-xs text-[#d54425] font-extrabold">{level.subtitle}</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5 max-w-md line-clamp-1 font-medium">
                       {level.description}
                     </p>
                   </div>
                 </div>
 
                 {/* Stars & Action Button */}
-                <div className="flex items-center justify-between w-full sm:w-auto sm:justify-end gap-4 shrink-0">
+                <div className="flex items-center justify-between w-full sm:w-auto sm:justify-end gap-3.5 shrink-0">
                   {/* Star Rating Display */}
                   <div className="flex items-center gap-1">
                     {[1, 2, 3].map((sIdx) => (
@@ -131,34 +131,34 @@ export const LevelSelectModal: React.FC = () => {
                         key={sIdx}
                         className={`w-4 h-4 ${
                           sIdx <= stars
-                            ? 'text-amber-400 fill-amber-400'
-                            : 'text-neutral-700 fill-neutral-800'
+                            ? 'text-amber-500 fill-amber-400'
+                            : 'text-stone-300 fill-stone-200'
                         }`}
                       />
                     ))}
                   </div>
 
-                  {/* Par Badge */}
-                  <div className="px-2.5 py-1 rounded-lg bg-neutral-950/80 border border-neutral-800 font-mono text-[10px] text-neutral-400 font-medium">
-                    Par: <span className="text-neutral-200 font-bold">{level.par}</span>
+                  {/* Par Badge (Timbul small) */}
+                  <div className="px-2.5 py-1 rounded-xl bg-[#fdfbf7] border-2 border-[#eee6dc] border-b-[2px] border-b-[#ded4c5] font-mono text-[10px] text-stone-600 font-bold">
+                    Target: <span className="text-stone-900 font-black">{level.par}</span> sentilan
                   </div>
 
-                  {/* Choose / Play Button */}
+                  {/* Choose / Play Button (Matching reference button styling) */}
                   {isUnlocked ? (
                     <button
                       data-testid={`select-level-btn-${level.id}`}
                       onClick={() => handleChooseLevel(level.id)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      className={`px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer ${
                         isCurrent
-                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                          : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
+                          ? 'timbul-btn-cream'
+                          : 'timbul-btn-coral'
                       }`}
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>{isCurrent ? 'Sedang Main' : 'Pilih'}</span>
+                      <span>{isCurrent ? 'Sedang Main' : 'Ayo Main!'}</span>
                     </button>
                   ) : (
-                    <div className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-neutral-600 flex items-center gap-1 bg-neutral-950 border border-neutral-900">
+                    <div className="px-3.5 py-1.5 rounded-2xl text-xs font-bold text-stone-400 flex items-center gap-1 bg-stone-100 border-2 border-stone-200 border-b-[3px] border-b-stone-300">
                       <Lock className="w-3.5 h-3.5" />
                       <span>Terkunci</span>
                     </div>
