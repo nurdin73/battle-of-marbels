@@ -41,8 +41,8 @@ export const PekaranganGrass: React.FC = () => {
         if (radiusFromCenter <= 1.85) continue;
 
         if (isBush && i === 0) {
-          // Add a low-poly bush
-          const bScale = 0.65 + Math.abs(Math.sin(x * 5 + z * 3)) * 0.35;
+          // Add a low-poly bush (scaled to natural garden bush size)
+          const bScale = 0.35 + Math.abs(Math.sin(x * 5 + z * 3)) * 0.18;
           list.push({
             modelSrc: BUSH_MODELS[list.length % BUSH_MODELS.length],
             position: [x, 0, z],
@@ -50,12 +50,12 @@ export const PekaranganGrass: React.FC = () => {
             rotationY: (x * 4.3 + z * 2.7) % (Math.PI * 2),
           });
         } else {
-          // Add grass tuft
-          const gScale = 0.75 + Math.abs(Math.cos(x * 4 + z * 7)) * 0.45;
+          // Add grass tuft (scaled to natural lawn / backyard height ~12-18cm)
+          const gScale = 0.28 + Math.abs(Math.cos(x * 4 + z * 7)) * 0.14;
           list.push({
             modelSrc: GRASS_MODELS[list.length % GRASS_MODELS.length],
             position: [x, 0, z],
-            scale: [gScale, gScale * 0.9, gScale],
+            scale: [gScale, gScale * 0.85, gScale],
             rotationY: (x * 3.7 + z * 2.1) % (Math.PI * 2),
           });
         }
