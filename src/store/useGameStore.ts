@@ -47,12 +47,14 @@ interface GameStoreState {
   evaluationEpoch: number;
   flightData: ActiveFlightData | null;
   lockedDirection: { x: number; z: number } | null;
+  customMarbleCount: number;
   oscillatingPower: number;
   launchTriggerCallback: ((powerPercentage: number) => void) | null;
 
   // Actions
   startGame: () => void;
   goToMainMenu: () => void;
+  startMatchWithMarbleCount: (count: number) => void;
   loadLevelConfig: (level: import('../types/level.types').LevelConfig) => void;
   setAimingState: (state: AimingState) => void;
   setLockedDirection: (dir: { x: number; z: number } | null) => void;
@@ -81,23 +83,34 @@ interface GameStoreState {
 }
 
 /**
- * Creates 9 target marbles arranged in a traditional cross pattern at the center
+ * Procedural concentric ring cluster layout for any number of target marbles (3 to 25)
  */
-function createDefaultTargetMarbles(): MarbleEntity[] {
+export function createTargetMarblesByCount(count: number): MarbleEntity[] {
+  const clampedCount = Math.max(3, Math.min(25, count));
   const r = ARENA_CONFIG.marbleRadius;
-  const spacing = r * 2.3;
+  const positions: [number, number, number][] = [];
 
-  const positions: [number, number, number][] = [
-    [0, r, 0], // Center
-    [spacing, r, 0], // Right
-    [-spacing, r, 0], // Left
-    [0, r, spacing], // Down
-    [0, r, -spacing], // Up
-    [spacing, r, spacing], // Bottom-Right
-    [-spacing, r, spacing], // Bottom-Left
-    [spacing, r, -spacing], // Top-Right
-    [-spacing, r, -spacing], // Top-Left
-  ];
+  // Center marble
+  positions.push([0, r, 0]);
+
+  let remaining = clampedCount - 1;
+  let ringIndex = 1;
+  const ringSpacing = r * 2.3;
+
+  while (remaining > 0) {
+    const ringRadius = ringIndex * ringSpacing;
+    const countInRing = Math.min(remaining, Math.round(6 * ringIndex));
+    for (let i = 0; i < countInRing; i++) {
+      const angle = (i / countInRing) * Math.PI * 2 + (ringIndex % 2 === 0 ? Math.PI / countInRing : 0);
+      positions.push([
+        Math.cos(angle) * ringRadius,
+        r,
+        Math.sin(angle) * ringRadius,
+      ]);
+    }
+    remaining -= countInRing;
+    ringIndex++;
+  }
 
   return positions.map((pos, idx) => ({
     id: `target-marble-${idx + 1}`,
@@ -107,6 +120,10 @@ function createDefaultTargetMarbles(): MarbleEntity[] {
     radius: r,
     swirlColor: DEFAULT_SWIRL_COLORS[idx % DEFAULT_SWIRL_COLORS.length],
   }));
+}
+
+function createDefaultTargetMarbles(): MarbleEntity[] {
+  return createTargetMarblesByCount(GAMEPLAY_CONFIG.initialTargetCount);
 }
 
 const INITIAL_GACOAN_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetPosition;
@@ -145,6 +162,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   evaluationEpoch: 0,
   flightData: null,
   lockedDirection: null,
+  customMarbleCount: 9,
   oscillatingPower: 0,
   launchTriggerCallback: null,
 
@@ -158,6 +176,41 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       lockedDirection: null,
       oscillatingPower: 0,
     });
+  },
+
+  startMatchWithMarbleCount: (count: number) => {
+    useCardStore.getState().resetCardStore();
+    const targets = createTargetMarblesByCount(count);
+    set((state) => ({
+      customMarbleCount: count,
+      targetMarbles: targets,
+      currentPar: Math.max(4, Math.ceil(count * 0.65)),
+      currentScreen: 'PLAYING',
+      aimingState: 'IDLE',
+      gacoanCurrentPos: INITIAL_GACOAN_POS,
+      targetLivePositions: {},
+      preShotTargetPositions: {},
+      drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
+      marblesOutsideRing: [],
+      targetsPocketedThisTurnIds: [],
+      foulRestoredIds: [],
+      foulRestoreRevision: 0,
+      score: 0,
+      flickCount: 0,
+      turnCount: 1,
+      comboStreak: 0,
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: true,
+      isGameOver: false,
+      starsAwarded: 0,
+      lastTurnOutcome: null,
+      targetsPocketedThisTurn: 0,
+      resetRevision: state.resetRevision + 1,
+      evaluationEpoch: 0,
+      flightData: null,
+      lockedDirection: null,
+      oscillatingPower: 0,
+    }));
   },
 
   goToMainMenu: () => {

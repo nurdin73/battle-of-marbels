@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/useGameStore';
 import { useLevelStore } from '../../store/useLevelStore';
 import { LevelSelectModal } from './LevelSelectModal';
 import { HelpModal } from './HelpModal';
+import { MatchSetupModal } from './MatchSetupModal';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 import {
   User,
@@ -15,17 +16,17 @@ import {
 } from 'lucide-react';
 
 export const MainMenu: React.FC = () => {
-  const startGame = useGameStore((s) => s.startGame);
   const isMuted = useGameStore((s) => s.isMuted);
   const toggleMute = useGameStore((s) => s.toggleMute);
   const openLevelSelectModal = useLevelStore((s) => s.openLevelSelectModal);
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isMatchSetupOpen, setIsMatchSetupOpen] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
 
   const handleStartGame = () => {
-    marbleAudio.playStoneClackSound(1.5);
-    startGame();
+    marbleAudio.playWoodKnockSound(1.1);
+    setIsMatchSetupOpen(true);
   };
 
   const handleOpenAdventure = () => {
@@ -58,6 +59,7 @@ export const MainMenu: React.FC = () => {
       {/* Modals triggered from Main Menu */}
       <LevelSelectModal />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <MatchSetupModal isOpen={isMatchSetupOpen} onClose={() => setIsMatchSetupOpen(false)} />
 
       {/* Floating Notice / Toast */}
       {profileNotice && (
@@ -184,7 +186,10 @@ export const MainMenu: React.FC = () => {
             {/* Button 4: MULTIPLAYER (Coral Red) */}
             <button
               data-testid="main-menu-multiplayer-btn"
-              onClick={() => handleShowNotice('Mode Multiplayer PvP segera hadir!')}
+              onClick={() => {
+                marbleAudio.playWoodKnockSound(1.1);
+                setIsMatchSetupOpen(true);
+              }}
               className="w-full bg-[#ef4444] hover:bg-[#f87171] border-2 border-[#dc2626] border-b-[5px] border-b-[#991b1b] text-white font-heading font-black text-sm sm:text-base py-2.5 px-4 rounded-2xl shadow-md active:translate-y-[2px] active:border-b-[2px] transition-all cursor-pointer flex flex-col items-center justify-center"
             >
               <span className="leading-tight tracking-wide text-stroke-black-heavy text-base sm:text-lg">MULTIPLAYER</span>
