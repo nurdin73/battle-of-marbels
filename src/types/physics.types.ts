@@ -41,6 +41,8 @@ export interface TrajectoryProjection {
   impactPoint?: Vector3D;
 }
 
+export type AppScreen = 'MAIN_MENU' | 'PLAYING';
+
 export type AimingState = 'IDLE' | 'AIMING' | 'CHARGING' | 'LAUNCHED' | 'AIRBORNE' | 'SIMULATING' | 'EVALUATING';
 
 export interface ActiveFlightData {

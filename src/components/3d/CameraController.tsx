@@ -8,6 +8,7 @@ import { ARENA_CONFIG } from '../../constants/physics.constants';
 
 export const CameraController: React.FC = () => {
   const controlsRef = useRef<OrbitControlsImpl>(null);
+  const currentScreen = useGameStore((s) => s.currentScreen);
   const aimingState = useGameStore((s) => s.aimingState);
   const gacoanPos = useGameStore((s) => s.gacoanCurrentPos);
 
@@ -24,7 +25,28 @@ export const CameraController: React.FC = () => {
     }
   }, []);
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
+    // 1. Cinematic slow orbital pan when on MAIN_MENU
+    if (currentScreen === 'MAIN_MENU') {
+      const t = clock.getElapsedTime() * 0.12;
+      const camRadius = 4.4;
+      const camX = Math.sin(t) * camRadius;
+      const camZ = Math.cos(t) * camRadius;
+
+      desiredCamPos.current.set(camX, 2.3, camZ);
+      smoothedTarget.current.set(0, 0.05, 0);
+
+      camera.position.lerp(desiredCamPos.current, 0.05);
+      camera.lookAt(smoothedTarget.current);
+
+      if (controlsRef.current) {
+        controlsRef.current.target.set(0, 0.05, 0);
+        controlsRef.current.update();
+      }
+      return;
+    }
+
+    // 2. In-game gameplay camera logic
     const gx = gacoanPos[0];
     const gy = gacoanPos[1];
     const gz = gacoanPos[2];
@@ -46,7 +68,6 @@ export const CameraController: React.FC = () => {
       );
     } else if (aimingState === 'AIMING' || aimingState === 'CHARGING') {
       // AIMING / CHARGING: Camera remains completely static at player's chosen vantage point.
-      // Zero auto-rotation, zero auto-centering, zero aim-following.
       cameraOffset.current.set(
         camera.position.x - gx,
         camera.position.y - ARENA_CONFIG.marbleRadius,
@@ -55,7 +76,6 @@ export const CameraController: React.FC = () => {
     } else {
       // AIRBORNE / SIMULATING / EVALUATING:
       // Translate camera smoothly following gacoan while strictly preserving the player's chosen angle/offset.
-      // Stable elevation (no vertical bobbing)
       const targetCamX = gx + cameraOffset.current.x;
       const targetCamY = ARENA_CONFIG.marbleRadius + cameraOffset.current.y;
       const targetCamZ = gz + cameraOffset.current.z;
@@ -71,7 +91,7 @@ export const CameraController: React.FC = () => {
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={aimingState === 'IDLE'}
+      enabled={currentScreen === 'PLAYING' && aimingState === 'IDLE'}
       enablePan={false}
       minDistance={1.8}
       maxDistance={8.0}

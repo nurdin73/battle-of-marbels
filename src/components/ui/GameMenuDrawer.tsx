@@ -11,7 +11,8 @@ import {
   Flame, 
   HelpCircle, 
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Home
 } from 'lucide-react';
 
 interface GameMenuDrawerProps {
@@ -25,6 +26,7 @@ export const GameMenuDrawer: React.FC<GameMenuDrawerProps> = ({ isOpen, onClose 
   const currentPar = useGameStore((s) => s.currentPar);
   const targetMarbles = useGameStore((s) => s.targetMarbles);
   const comboStreak = useGameStore((s) => s.comboStreak);
+  const goToMainMenu = useGameStore((s) => s.goToMainMenu);
 
   const currentLevelId = useLevelStore((s) => s.currentLevelId);
   const openLevelSelectModal = useLevelStore((s) => s.openLevelSelectModal);
@@ -166,6 +168,19 @@ export const GameMenuDrawer: React.FC<GameMenuDrawerProps> = ({ isOpen, onClose 
               Tarik kelereng jagoan ke belakang untuk mengatur daya & arah sentil. Gunakan <em>Kantung Trik</em> di bawah untuk mengeluarkan jurus kapur ajaib!
             </div>
           </div>
+
+          {/* Section 5: Kembali ke Menu Utama */}
+          <button
+            data-testid="drawer-go-main-menu-btn"
+            onClick={() => {
+              onClose();
+              goToMainMenu();
+            }}
+            className="w-full timbul-btn-cream py-2.5 px-4 text-xs font-heading font-black text-stone-700 flex items-center justify-center gap-2 shadow-sm cursor-pointer active:translate-y-[1px]"
+          >
+            <Home className="w-4 h-4 text-stone-600" />
+            <span>KEMBALI KE MENU UTAMA</span>
+          </button>
         </div>
 
         {/* Drawer Footer */}

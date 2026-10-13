@@ -153,17 +153,19 @@ export function useSlingshot(
     };
   }, [executeLaunch, setLaunchTriggerCallback]);
 
+  const currentScreen = useGameStore((s) => s.currentScreen);
+
   const onPointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      // Only allow aiming when game is IDLE
-      if (aimingState !== 'IDLE') return;
+      // Only allow aiming when game is active (PLAYING) and IDLE
+      if (currentScreen !== 'PLAYING' || aimingState !== 'IDLE') return;
 
       e.stopPropagation();
       marbleAudio.startAmbientSound();
       setIsDragging(true);
       setAimingState('AIMING');
     },
-    [aimingState, setAimingState]
+    [currentScreen, aimingState, setAimingState]
   );
 
   // Global window pointer listeners to seamlessly track drags across the entire screen

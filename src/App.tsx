@@ -1,7 +1,11 @@
 import { SceneContainer } from './components/3d/SceneContainer';
 import { HUDOverlay } from './components/ui/HUDOverlay';
+import { MainMenu } from './components/ui/MainMenu';
+import { useGameStore } from './store/useGameStore';
 
 export function App() {
+  const currentScreen = useGameStore((s) => s.currentScreen);
+
   return (
     <main
       data-testid="marble-app-root"
@@ -10,8 +14,8 @@ export function App() {
       {/* 3D Physics Canvas Layer */}
       <SceneContainer />
 
-      {/* 2D Interactive UI & HUD Layer */}
-      <HUDOverlay />
+      {/* 2D Interactive UI Layer: Main Menu vs In-Game HUD */}
+      {currentScreen === 'MAIN_MENU' ? <MainMenu /> : <HUDOverlay />}
     </main>
   );
 }

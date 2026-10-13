@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   AimingState,
+  AppScreen,
   MarbleMaterialType,
   MarbleEntity,
   ActiveFlightData,
@@ -17,6 +18,7 @@ interface DragState {
 }
 
 interface GameStoreState {
+  currentScreen: AppScreen;
   aimingState: AimingState;
   gacoanMaterial: MarbleMaterialType;
   gacoanCurrentPos: [number, number, number];
@@ -49,6 +51,8 @@ interface GameStoreState {
   launchTriggerCallback: ((powerPercentage: number) => void) | null;
 
   // Actions
+  startGame: () => void;
+  goToMainMenu: () => void;
   loadLevelConfig: (level: import('../types/level.types').LevelConfig) => void;
   setAimingState: (state: AimingState) => void;
   setLockedDirection: (dir: { x: number; z: number } | null) => void;
@@ -108,6 +112,7 @@ function createDefaultTargetMarbles(): MarbleEntity[] {
 const INITIAL_GACOAN_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetPosition;
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
+  currentScreen: 'MAIN_MENU',
   aimingState: 'IDLE',
   gacoanMaterial: 'GLASS_CLASSIC',
   gacoanCurrentPos: INITIAL_GACOAN_POS,
@@ -128,7 +133,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   turnCount: 1,
   comboStreak: 0,
   turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-  isTimerActive: true,
+  isTimerActive: false,
   isGameOver: false,
   starsAwarded: 0,
   currentPar: GAMEPLAY_CONFIG.parFlicks,
@@ -143,9 +148,33 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   oscillatingPower: 0,
   launchTriggerCallback: null,
 
+  startGame: () => {
+    set({
+      currentScreen: 'PLAYING',
+      isTimerActive: true,
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      aimingState: 'IDLE',
+      isGameOver: false,
+      lockedDirection: null,
+      oscillatingPower: 0,
+    });
+  },
+
+  goToMainMenu: () => {
+    set({
+      currentScreen: 'MAIN_MENU',
+      isTimerActive: false,
+      aimingState: 'IDLE',
+      isGameOver: false,
+      lockedDirection: null,
+      oscillatingPower: 0,
+    });
+  },
+
   setAimingState: (aimingState) => {
-    // Timer only ticks during IDLE, AIMING, or CHARGING
-    const isTimerActive = aimingState === 'IDLE' || aimingState === 'AIMING' || aimingState === 'CHARGING';
+    const { currentScreen } = get();
+    // Timer only ticks during IDLE, AIMING, or CHARGING when PLAYING
+    const isTimerActive = currentScreen === 'PLAYING' && (aimingState === 'IDLE' || aimingState === 'AIMING' || aimingState === 'CHARGING');
     set({ aimingState, isTimerActive });
   },
 
