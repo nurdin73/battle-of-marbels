@@ -7,7 +7,7 @@ export const MARBLE_PHYSICAL_CONFIGS: Record<MarbleMaterialType, MarblePhysicalP
     frictionStatic: 0.30,
     frictionDynamic: 0.22,
     linearDamping: 0.18,
-    angularDamping: 0.15,
+    angularDamping: 0.40,
   },
   MARBLE_STONE: {
     mass: 0.038,
@@ -15,7 +15,7 @@ export const MARBLE_PHYSICAL_CONFIGS: Record<MarbleMaterialType, MarblePhysicalP
     frictionStatic: 0.38,
     frictionDynamic: 0.28,
     linearDamping: 0.22,
-    angularDamping: 0.18,
+    angularDamping: 0.45,
   },
   BEARING_STEEL: {
     mass: 0.055,
@@ -23,7 +23,7 @@ export const MARBLE_PHYSICAL_CONFIGS: Record<MarbleMaterialType, MarblePhysicalP
     frictionStatic: 0.25,
     frictionDynamic: 0.18,
     linearDamping: 0.14,
-    angularDamping: 0.12,
+    angularDamping: 0.35,
   },
 };
 
@@ -33,7 +33,7 @@ export const TARGET_MARBLE_PHYSICS: MarblePhysicalProps = {
   frictionStatic: 0.30,
   frictionDynamic: 0.22,
   linearDamping: 0.18,
-  angularDamping: 0.15,
+  angularDamping: 0.40,
 };
 
 export const ARENA_CONFIG = {
@@ -46,6 +46,13 @@ export const ARENA_CONFIG = {
   maxImpulse: 0.14,
   defaultTrajectoryLength: 2.5,
   restVelocityThreshold: 0.025,
+};
+
+export const GAMEPLAY_CONFIG = {
+  turnTimeLimitSeconds: 20,
+  parFlicks: 5,
+  initialTargetCount: 9,
+  foulResetPosition: [0, 0.075, 2.3] as [number, number, number],
 };
 
 export const DEFAULT_SWIRL_COLORS = [

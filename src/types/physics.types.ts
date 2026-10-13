@@ -53,3 +53,13 @@ export interface ActiveFlightData {
   isHit: boolean;
   duration: number;
 }
+
+export type TurnResultType = 'COMBO_EXTRA_TURN' | 'NORMAL_SHOT' | 'FOUL_OUT_OF_BOUNDS' | 'TIMEOUT';
+
+export interface TurnEvaluationOutcome {
+  resultType: TurnResultType;
+  targetsPocketed: number;
+  gacoanFouled: boolean;
+  message: string;
+}
+

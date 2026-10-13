@@ -1,6 +1,12 @@
 import { create } from 'zustand';
-import { AimingState, MarbleMaterialType, MarbleEntity, ActiveFlightData } from '../types/physics.types';
-import { ARENA_CONFIG, DEFAULT_SWIRL_COLORS } from '../constants/physics.constants';
+import {
+  AimingState,
+  MarbleMaterialType,
+  MarbleEntity,
+  ActiveFlightData,
+  TurnEvaluationOutcome,
+} from '../types/physics.types';
+import { ARENA_CONFIG, DEFAULT_SWIRL_COLORS, GAMEPLAY_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 
 interface DragState {
@@ -16,9 +22,21 @@ interface GameStoreState {
   drag: DragState;
   targetMarbles: MarbleEntity[];
   targetLivePositions: Record<string, [number, number, number]>;
+  preShotTargetPositions: Record<string, [number, number, number]>;
   marblesOutsideRing: string[];
+  targetsPocketedThisTurnIds: string[];
+  foulRestoredIds: string[];
+  foulRestoreRevision: number;
   score: number;
   flickCount: number;
+  turnCount: number;
+  comboStreak: number;
+  turnTimer: number;
+  isTimerActive: boolean;
+  isGameOver: boolean;
+  starsAwarded: number;
+  lastTurnOutcome: TurnEvaluationOutcome | null;
+  targetsPocketedThisTurn: number;
   isMuted: boolean;
   showTrajectory: boolean;
   resetRevision: number;
@@ -36,9 +54,15 @@ interface GameStoreState {
   markMarbleOutsideRing: (id: string) => void;
   recordFlick: () => void;
   triggerEvaluation: () => void;
+  tickTimer: () => void;
+  resetTurnTimer: () => void;
+  handleTurnTimeout: () => void;
+  evaluateTurnOutcome: (gacoanPos: [number, number, number]) => void;
+  clearTurnOutcome: () => void;
   toggleMute: () => void;
   toggleTrajectory: () => void;
   resetArena: () => void;
+  restartGame: () => void;
 }
 
 /**
@@ -70,9 +94,9 @@ function createDefaultTargetMarbles(): MarbleEntity[] {
   }));
 }
 
-const INITIAL_GACOAN_POS: [number, number, number] = [0, ARENA_CONFIG.marbleRadius, 2.3];
+const INITIAL_GACOAN_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetPosition;
 
-export const useGameStore = create<GameStoreState>((set) => ({
+export const useGameStore = create<GameStoreState>((set, get) => ({
   aimingState: 'IDLE',
   gacoanMaterial: 'GLASS_CLASSIC',
   gacoanCurrentPos: INITIAL_GACOAN_POS,
@@ -83,16 +107,32 @@ export const useGameStore = create<GameStoreState>((set) => ({
   },
   targetMarbles: createDefaultTargetMarbles(),
   targetLivePositions: {},
+  preShotTargetPositions: {},
   marblesOutsideRing: [],
+  targetsPocketedThisTurnIds: [],
+  foulRestoredIds: [],
+  foulRestoreRevision: 0,
   score: 0,
   flickCount: 0,
+  turnCount: 1,
+  comboStreak: 0,
+  turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+  isTimerActive: true,
+  isGameOver: false,
+  starsAwarded: 0,
+  lastTurnOutcome: null,
+  targetsPocketedThisTurn: 0,
   isMuted: false,
   showTrajectory: true,
   resetRevision: 0,
   evaluationEpoch: 0,
   flightData: null,
 
-  setAimingState: (aimingState) => set({ aimingState }),
+  setAimingState: (aimingState) => {
+    // Timer only ticks during IDLE or AIMING
+    const isTimerActive = aimingState === 'IDLE' || aimingState === 'AIMING';
+    set({ aimingState, isTimerActive });
+  },
 
   setGacoanMaterial: (gacoanMaterial) => set({ gacoanMaterial }),
 
@@ -124,18 +164,172 @@ export const useGameStore = create<GameStoreState>((set) => ({
       return {
         marblesOutsideRing: [...state.marblesOutsideRing, id],
         score: state.score + 1,
+        targetsPocketedThisTurn: state.targetsPocketedThisTurn + 1,
+        targetsPocketedThisTurnIds: [...state.targetsPocketedThisTurnIds, id],
       };
     }),
 
   recordFlick: () =>
-    set((state) => ({
-      flickCount: state.flickCount + 1,
-    })),
+    set((state) => {
+      // Snapshot active target positions right before release for potential foul rollback
+      const preShot: Record<string, [number, number, number]> = {};
+      state.targetMarbles.forEach((m) => {
+        if (!state.marblesOutsideRing.includes(m.id)) {
+          preShot[m.id] = state.targetLivePositions[m.id] || m.initialPosition;
+        }
+      });
+
+      return {
+        flickCount: state.flickCount + 1,
+        turnCount: state.turnCount + 1,
+        isTimerActive: false,
+        targetsPocketedThisTurn: 0,
+        targetsPocketedThisTurnIds: [],
+        foulRestoredIds: [],
+        preShotTargetPositions: preShot,
+      };
+    }),
 
   triggerEvaluation: () =>
     set((state) => ({
       evaluationEpoch: state.evaluationEpoch + 1,
     })),
+
+  tickTimer: () => {
+    const { turnTimer, isTimerActive, aimingState, handleTurnTimeout } = get();
+    if (!isTimerActive || (aimingState !== 'IDLE' && aimingState !== 'AIMING')) return;
+
+    if (turnTimer <= 1) {
+      handleTurnTimeout();
+      return;
+    }
+
+    const nextTime = turnTimer - 1;
+    if (nextTime <= 5) {
+      marbleAudio.playTickSound(nextTime <= 3);
+    }
+    set({ turnTimer: nextTime });
+  },
+
+  resetTurnTimer: () =>
+    set({
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: true,
+    }),
+
+  handleTurnTimeout: () => {
+    marbleAudio.playFoulSound();
+    set((state) => ({
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: true,
+      comboStreak: 0,
+      turnCount: state.turnCount + 1,
+      drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
+      aimingState: 'IDLE',
+      lastTurnOutcome: {
+        resultType: 'TIMEOUT',
+        targetsPocketed: 0,
+        gacoanFouled: false,
+        message: 'WAKTU HABIS! Batas 20 detik terlewati.',
+      },
+    }));
+  },
+
+  evaluateTurnOutcome: (gacoanPos) => {
+    const state = get();
+    const gacoanDist = Math.hypot(gacoanPos[0], gacoanPos[2]);
+    const isGacoanFouled = gacoanDist > ARENA_CONFIG.ringRadius + ARENA_CONFIG.marbleRadius;
+    const targetsPocketedIds = state.targetsPocketedThisTurnIds;
+    const targetsPocketedCount = targetsPocketedIds.length;
+
+    let resultOutcome: TurnEvaluationOutcome;
+    let nextComboStreak = 0;
+    let nextGacoanPos = gacoanPos;
+    let finalScore = state.score;
+    let nextMarblesOutside = state.marblesOutsideRing;
+    let nextFoulRestoredIds: string[] = [];
+    let nextFoulRestoreRevision = state.foulRestoreRevision;
+
+    if (isGacoanFouled) {
+      // FOUL: Player marble flew out of the ring
+      marbleAudio.playFoulSound();
+      nextComboStreak = 0;
+      nextGacoanPos = GAMEPLAY_CONFIG.foulResetPosition;
+
+      if (targetsPocketedCount > 0) {
+        // Rollback: Cancel score and return all target marbles that were knocked out during this foul turn
+        finalScore = Math.max(0, state.score - targetsPocketedCount);
+        nextMarblesOutside = state.marblesOutsideRing.filter((id) => !targetsPocketedIds.includes(id));
+        nextFoulRestoredIds = [...targetsPocketedIds];
+        nextFoulRestoreRevision = state.foulRestoreRevision + 1;
+
+        resultOutcome = {
+          resultType: 'FOUL_OUT_OF_BOUNDS',
+          targetsPocketed: 0,
+          gacoanFouled: true,
+          message: `FOUL! Gacoan keluar ring. ${targetsPocketedCount} kelereng target dikembalikan ke posisi semula!`,
+        };
+      } else {
+        resultOutcome = {
+          resultType: 'FOUL_OUT_OF_BOUNDS',
+          targetsPocketed: 0,
+          gacoanFouled: true,
+          message: 'FOUL! Gacoan terpental keluar arena! Posisi gacoan di-reset.',
+        };
+      }
+    } else if (targetsPocketedCount > 0) {
+      // COMBO: Valid shot, knocked out target marble(s)
+      marbleAudio.playComboSound();
+      nextComboStreak = state.comboStreak + 1;
+      resultOutcome = {
+        resultType: 'COMBO_EXTRA_TURN',
+        targetsPocketed: targetsPocketedCount,
+        gacoanFouled: false,
+        message: `KOMBO SENTILAN! +${targetsPocketedCount} Kelereng Keluar! Dapat Giliran Tambahan!`,
+      };
+    } else {
+      // Normal Shot without score
+      nextComboStreak = 0;
+      resultOutcome = {
+        resultType: 'NORMAL_SHOT',
+        targetsPocketed: 0,
+        gacoanFouled: false,
+        message: 'Sentilan Sah. Gacoan bertahan di dalam arena.',
+      };
+    }
+
+    // Check Win Condition: All 9 target marbles pocketed
+    const isGameOver = finalScore >= GAMEPLAY_CONFIG.initialTargetCount;
+    let starsAwarded = 0;
+    if (isGameOver) {
+      marbleAudio.playVictorySound();
+      if (state.flickCount <= GAMEPLAY_CONFIG.parFlicks) {
+        starsAwarded = 3;
+      } else if (state.flickCount <= GAMEPLAY_CONFIG.parFlicks + 3) {
+        starsAwarded = 2;
+      } else {
+        starsAwarded = 1;
+      }
+    }
+
+    set({
+      score: finalScore,
+      marblesOutsideRing: nextMarblesOutside,
+      foulRestoredIds: nextFoulRestoredIds,
+      foulRestoreRevision: nextFoulRestoreRevision,
+      lastTurnOutcome: resultOutcome,
+      comboStreak: nextComboStreak,
+      gacoanCurrentPos: nextGacoanPos,
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: !isGameOver,
+      isGameOver,
+      starsAwarded,
+      targetsPocketedThisTurn: 0,
+      targetsPocketedThisTurnIds: [],
+    });
+  },
+
+  clearTurnOutcome: () => set({ lastTurnOutcome: null }),
 
   toggleMute: () =>
     set((state) => {
@@ -154,9 +348,44 @@ export const useGameStore = create<GameStoreState>((set) => ({
       aimingState: 'IDLE',
       gacoanCurrentPos: INITIAL_GACOAN_POS,
       targetLivePositions: {},
+      preShotTargetPositions: {},
       drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
       marblesOutsideRing: [],
+      targetsPocketedThisTurnIds: [],
+      foulRestoredIds: [],
+      foulRestoreRevision: 0,
       score: 0,
+      comboStreak: 0,
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: true,
+      lastTurnOutcome: null,
+      targetsPocketedThisTurn: 0,
+      resetRevision: state.resetRevision + 1,
+      evaluationEpoch: 0,
+      flightData: null,
+    })),
+
+  restartGame: () =>
+    set((state) => ({
+      aimingState: 'IDLE',
+      gacoanCurrentPos: INITIAL_GACOAN_POS,
+      targetLivePositions: {},
+      preShotTargetPositions: {},
+      drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
+      marblesOutsideRing: [],
+      targetsPocketedThisTurnIds: [],
+      foulRestoredIds: [],
+      foulRestoreRevision: 0,
+      score: 0,
+      flickCount: 0,
+      turnCount: 1,
+      comboStreak: 0,
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: true,
+      isGameOver: false,
+      starsAwarded: 0,
+      lastTurnOutcome: null,
+      targetsPocketedThisTurn: 0,
       resetRevision: state.resetRevision + 1,
       evaluationEpoch: 0,
       flightData: null,

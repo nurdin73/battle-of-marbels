@@ -142,6 +142,106 @@ class MarbleAudioSynthesizer {
     osc2.start(now + 0.08);
     osc2.stop(now + 0.3);
   }
+
+  /**
+   * Procedural countdown tick-tock
+   */
+  public playTickSound(isUrgent: boolean = false): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(isUrgent ? 880 : 520, now);
+    gain.gain.setValueAtTime(isUrgent ? 0.15 : 0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  /**
+   * Procedural buzz/dull tone for foul or turn timeout
+   */
+  public playFoulSound(): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.25);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.28);
+  }
+
+  /**
+   * Procedural celebratory fanfare chord for combo streak
+   */
+  public playComboSound(): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5 major arpeggio
+    freqs.forEach((f, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now + idx * 0.04);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.setValueAtTime(0.18, now + idx * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.2);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.04);
+      osc.stop(now + idx * 0.04 + 0.22);
+    });
+  }
+
+  /**
+   * Procedural triumphant victory fanfare
+   */
+  public playVictorySound(): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const notes = [
+      { f: 523.25, t: 0.0, d: 0.12 },
+      { f: 659.25, t: 0.12, d: 0.12 },
+      { f: 783.99, t: 0.24, d: 0.16 },
+      { f: 1046.5, t: 0.42, d: 0.45 },
+    ];
+
+    notes.forEach((note) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(note.f, now + note.t);
+      gain.gain.setValueAtTime(0.22, now + note.t);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + note.t + note.d);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + note.t);
+      osc.stop(now + note.t + note.d + 0.02);
+    });
+  }
 }
 
 export const marbleAudio = new MarbleAudioSynthesizer();

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { RapierRigidBody, RigidBody } from '@react-three/rapier';
-import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS } from '../../constants/physics.constants';
+import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
+import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS, GAMEPLAY_CONFIG } from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
-const INITIAL_SHOOTER_POS: [number, number, number] = [0, ARENA_CONFIG.marbleRadius, 2.3];
+const INITIAL_SHOOTER_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetPosition;
 
 export const ShooterMarble: React.FC = () => {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
@@ -19,6 +19,7 @@ export const ShooterMarble: React.FC = () => {
   const setAimingState = useGameStore((s) => s.setAimingState);
   const updateGacoanPos = useGameStore((s) => s.updateGacoanPos);
   const triggerEvaluation = useGameStore((s) => s.triggerEvaluation);
+  const evaluateTurnOutcome = useGameStore((s) => s.evaluateTurnOutcome);
   const resetRevision = useGameStore((s) => s.resetRevision);
   const flightData = useGameStore((s) => s.flightData);
   const setFlightData = useGameStore((s) => s.setFlightData);
@@ -102,24 +103,22 @@ export const ShooterMarble: React.FC = () => {
         const dirX = flightData.direction.x;
         const dirZ = flightData.direction.z;
 
-        // Compute natural forward rolling angular velocity (omega = v / r)
+        // Natural forward speed based on physical impulse
         const forwardSpeed = flightData.isHit ? speed * 0.95 : speed * 0.90;
-        const rollSpeed = forwardSpeed / ARENA_CONFIG.marbleRadius;
-        const angvelX = dirZ * rollSpeed;
-        const angvelZ = -dirX * rollSpeed;
 
         if (flightData.isHit) {
           // Energetic elastic collision into target marbles
           rigidBodyRef.current.setLinvel({ x: dirX * forwardSpeed, y: 0.05, z: dirZ * forwardSpeed }, true);
-          rigidBodyRef.current.setAngvel({ x: angvelX * 0.6, y: 0.0, z: angvelZ * 0.6 }, true);
+          // Let Rapier WASM contact solver compute natural torque without artificial spin
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
           marbleAudio.playCollisionSound({
             materialType: gacoanMaterial,
             relativeVelocity: speed,
           });
         } else {
-          // Landing on pekarangan ground with natural roll and crisp contact bounce
-          rigidBodyRef.current.setLinvel({ x: dirX * forwardSpeed, y: 0.08, z: dirZ * forwardSpeed }, true);
-          rigidBodyRef.current.setAngvel({ x: angvelX, y: 0.0, z: angvelZ }, true);
+          // Landing on pekarangan ground: linear velocity forward, zero artificial yaw spin
+          rigidBodyRef.current.setLinvel({ x: dirX * forwardSpeed, y: 0.06, z: dirZ * forwardSpeed }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
           marbleAudio.playCollisionSound({
             materialType: gacoanMaterial,
             relativeVelocity: speed * 0.45,
@@ -157,8 +156,26 @@ export const ShooterMarble: React.FC = () => {
         // Wait exactly 2 seconds after gacoan stops before triggering pocketing evaluation
         evaluationTimerRef.current = setTimeout(() => {
           triggerEvaluation();
-          // Give brief 400ms buffer for shrink animation before re-enabling aim
+          // Give brief 400ms buffer for shrink animation before final turn outcome resolution
           setTimeout(() => {
+            const finalTrans = rigidBodyRef.current ? rigidBodyRef.current.translation() : null;
+            const finalPos: [number, number, number] = finalTrans
+              ? [finalTrans.x, finalTrans.y, finalTrans.z]
+              : INITIAL_SHOOTER_POS;
+
+            evaluateTurnOutcome(finalPos);
+
+            const distFromOrigin = Math.hypot(finalPos[0], finalPos[2]);
+            const isFoul = distFromOrigin > ARENA_CONFIG.ringRadius + ARENA_CONFIG.marbleRadius;
+
+            if (isFoul && rigidBodyRef.current) {
+              const resetPos = GAMEPLAY_CONFIG.foulResetPosition;
+              rigidBodyRef.current.setTranslation({ x: resetPos[0], y: resetPos[1], z: resetPos[2] }, true);
+              rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+              rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+              updateGacoanPos(resetPos);
+            }
+
             setAimingState('IDLE');
           }, 400);
         }, 2000);
@@ -233,7 +250,7 @@ export const ShooterMarble: React.FC = () => {
   return (
     <RigidBody
       ref={rigidBodyRef}
-      colliders="ball"
+      colliders={false}
       ccd={true}
       position={INITIAL_SHOOTER_POS}
       mass={physicalConfig.mass}
@@ -243,8 +260,11 @@ export const ShooterMarble: React.FC = () => {
       angularDamping={physicalConfig.angularDamping}
       onCollisionEnter={handleCollision}
     >
+      {/* Explicit Rapier physical ball collider: strictly matches real marble radius */}
+      <BallCollider args={[ARENA_CONFIG.marbleRadius]} />
+
       <group onPointerDown={onPointerDown}>
-        {/* Generous invisible hit target for effortless click & touch capture */}
+        {/* Generous invisible hit target for effortless click & touch capture (has NO physics collision) */}
         <mesh>
           <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 2.5, 16, 16]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -252,9 +272,9 @@ export const ShooterMarble: React.FC = () => {
 
         {renderMaterial()}
 
-        {/* Pulsing selection ring when IDLE */}
+        {/* Pulsing selection ring flush on the ground when IDLE */}
         {aimingState === 'IDLE' && (
-          <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[ARENA_CONFIG.marbleRadius * 1.3, ARENA_CONFIG.marbleRadius * 1.5, 32]} />
             <meshBasicMaterial color="#38bdf8" transparent opacity={0.6} />
           </mesh>

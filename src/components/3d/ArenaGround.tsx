@@ -9,9 +9,12 @@ export const ArenaGround: React.FC = () => {
   return (
     <group>
       {/* Ground Physical Body */}
-      <RigidBody type="fixed" friction={0.35} restitution={0.35}>
-        {/* Main soil plane */}
-        <mesh receiveShadow position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <RigidBody type="fixed" colliders={false} friction={0.35} restitution={0.35}>
+        {/* Solid Ground Plane Collider: Top surface exactly at Y = 0.0 */}
+        <CuboidCollider args={[boundaryHalfSize, 0.05, boundaryHalfSize]} position={[0, -0.05, 0]} />
+
+        {/* Main soil plane visual */}
+        <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[ARENA_CONFIG.groundSize, ARENA_CONFIG.groundSize]} />
           <meshStandardMaterial
             color="#78350f"

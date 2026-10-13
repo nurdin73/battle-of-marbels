@@ -22,6 +22,9 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
   const evaluationEpoch = useGameStore((s) => s.evaluationEpoch);
   const updateTargetLivePosition = useGameStore((s) => s.updateTargetLivePosition);
   const aimingState = useGameStore((s) => s.aimingState);
+  const foulRestoreRevision = useGameStore((s) => s.foulRestoreRevision);
+  const foulRestoredIds = useGameStore((s) => s.foulRestoredIds);
+  const preShotTargetPositions = useGameStore((s) => s.preShotTargetPositions);
 
   // Reset position, scale, and physics when arena is reset
   useEffect(() => {
@@ -48,6 +51,35 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
       updateTargetLivePosition(marble.id, marble.initialPosition);
     }
   }, [resetRevision, marble.initialPosition, marble.id, updateTargetLivePosition]);
+
+  // Restore target marble if it exited during a foul shot (traditional rules)
+  useEffect(() => {
+    if (foulRestoreRevision <= 0 || !foulRestoredIds.includes(marble.id)) return;
+
+    isOutsideRef.current = false;
+    setIsCollected(false);
+
+    if (groupRef.current) {
+      groupRef.current.scale.set(1, 1, 1);
+      groupRef.current.visible = true;
+    }
+
+    if (rigidBodyRef.current) {
+      rigidBodyRef.current.setEnabled(true);
+      const restorePos = preShotTargetPositions[marble.id] || marble.initialPosition;
+      rigidBodyRef.current.setTranslation(
+        {
+          x: restorePos[0],
+          y: restorePos[1],
+          z: restorePos[2],
+        },
+        true
+      );
+      rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      updateTargetLivePosition(marble.id, restorePos);
+    }
+  }, [foulRestoreRevision, foulRestoredIds, marble.id, marble.initialPosition, preShotTargetPositions, updateTargetLivePosition]);
 
   // Evaluated ONLY after 2 seconds after the player's gacoan has completely stopped
   useEffect(() => {
