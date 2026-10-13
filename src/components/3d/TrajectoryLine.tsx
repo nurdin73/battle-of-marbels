@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { ARENA_CONFIG } from '../../constants/physics.constants';
-import { calculateTrajectory } from '../../utils/trajectory.utils';
+import { calculateTrajectory, ObstacleCollider, PEKARANGAN_OBSTACLES } from '../../utils/trajectory.utils';
 import { Vector3D } from '../../types/physics.types';
 import { useCardStore } from '../../store/useCardStore';
+import { useLevelStore } from '../../store/useLevelStore';
+import { ADVENTURE_LEVELS } from '../../constants/levels.constants';
 
 export const TrajectoryLine: React.FC = () => {
   const aimingState = useGameStore((s) => s.aimingState);
@@ -16,6 +18,31 @@ export const TrajectoryLine: React.FC = () => {
   const activeCardId = useCardStore((s) => s.activeCardId);
   const handCards = useCardStore((s) => s.handCards);
   const activeCard = handCards.find((c) => c.id === activeCardId);
+
+  const currentLevelId = useLevelStore((s) => s.currentLevelId);
+  const currentLevel = useMemo(
+    () => ADVENTURE_LEVELS.find((l) => l.id === currentLevelId),
+    [currentLevelId]
+  );
+
+  const combinedObstacles = useMemo<ObstacleCollider[]>(() => {
+    const list: ObstacleCollider[] = [...PEKARANGAN_OBSTACLES];
+    if (currentLevel?.obstacles) {
+      currentLevel.obstacles.forEach((obs) => {
+        if (obs.type === 'BAMBOO_CHUTE' || obs.type === 'BRICK_WALL' || obs.type === 'RISING_GATE') {
+          const halfX = obs.size ? obs.size[0] / 2 : 0.2;
+          const halfZ = obs.size ? obs.size[2] / 2 : 0.5;
+          list.push({
+            id: obs.id,
+            type: 'BOX',
+            center: [obs.position[0], obs.position[2]],
+            halfSize: [halfX, halfZ],
+          });
+        }
+      });
+    }
+    return list;
+  }, [currentLevel]);
 
   const shooterOrigin: Vector3D = useMemo(
     () => ({
@@ -64,6 +91,7 @@ export const TrajectoryLine: React.FC = () => {
       isLob,
       distanceMultiplier: activeCard?.modifier.trajectoryDistanceMultiplier,
       apexHeightMultiplier: activeCard?.modifier.apexHeightMultiplier,
+      obstacles: combinedObstacles,
     };
 
     return calculateTrajectory(
@@ -83,6 +111,7 @@ export const TrajectoryLine: React.FC = () => {
     activeTargets,
     activeCard,
     isLob,
+    combinedObstacles,
   ]);
 
   if (!trajectory || trajectory.points.length === 0) return null;

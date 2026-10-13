@@ -6,6 +6,51 @@ export interface TargetSphere {
   radius: number;
 }
 
+export interface ObstacleCollider {
+  id: string;
+  type: 'CIRCLE' | 'BOX';
+  center: [number, number]; // [x, z]
+  radius?: number;          // for CIRCLE
+  halfSize?: [number, number]; // [halfX, halfZ] for BOX
+}
+
+export const PEKARANGAN_OBSTACLES: ObstacleCollider[] = [
+  // 19 Natural river stones around the chalk ring
+  { id: 'stone-0', type: 'CIRCLE', center: [-1.8, -2.6], radius: 0.16 },
+  { id: 'stone-1', type: 'CIRCLE', center: [-0.8, -2.8], radius: 0.18 },
+  { id: 'stone-2', type: 'CIRCLE', center: [0.9, -2.7], radius: 0.20 },
+  { id: 'stone-3', type: 'CIRCLE', center: [2.0, -2.5], radius: 0.22 },
+  { id: 'stone-4', type: 'CIRCLE', center: [-2.5, -2.1], radius: 0.16 },
+  { id: 'stone-5', type: 'CIRCLE', center: [-3.1, -2.6], radius: 0.18 },
+  { id: 'stone-6', type: 'CIRCLE', center: [-2.8, -3.2], radius: 0.20 },
+  { id: 'stone-7', type: 'CIRCLE', center: [2.5, -2.0], radius: 0.22 },
+  { id: 'stone-8', type: 'CIRCLE', center: [3.2, -2.5], radius: 0.16 },
+  { id: 'stone-9', type: 'CIRCLE', center: [2.9, -3.1], radius: 0.18 },
+  { id: 'stone-10', type: 'CIRCLE', center: [-2.6, 0.4], radius: 0.20 },
+  { id: 'stone-11', type: 'CIRCLE', center: [-2.9, 1.2], radius: 0.22 },
+  { id: 'stone-12', type: 'CIRCLE', center: [-2.4, 2.0], radius: 0.16 },
+  { id: 'stone-13', type: 'CIRCLE', center: [2.6, 0.3], radius: 0.18 },
+  { id: 'stone-14', type: 'CIRCLE', center: [2.9, 1.1], radius: 0.20 },
+  { id: 'stone-15', type: 'CIRCLE', center: [2.5, 2.1], radius: 0.22 },
+  { id: 'stone-16', type: 'CIRCLE', center: [-1.6, 3.1], radius: 0.16 },
+  { id: 'stone-17', type: 'CIRCLE', center: [1.5, 3.2], radius: 0.18 },
+  { id: 'stone-18', type: 'CIRCLE', center: [0.2, 3.6], radius: 0.20 },
+
+  // Terracotta pots / ember
+  { id: 'pot-0', type: 'CIRCLE', center: [-2.7, -2.4], radius: 0.32 },
+  { id: 'pot-1', type: 'CIRCLE', center: [2.7, -2.2], radius: 0.28 },
+  { id: 'pot-2', type: 'CIRCLE', center: [-3.3, 0.8], radius: 0.25 },
+
+  // Trees
+  { id: 'tree-0', type: 'CIRCLE', center: [-4.2, -4.5], radius: 0.38 },
+  { id: 'tree-1', type: 'CIRCLE', center: [4.2, -4.2], radius: 0.28 },
+
+  // Bamboo fences (Cuboid Colliders)
+  { id: 'fence-north', type: 'BOX', center: [0, -5.8], halfSize: [5.8, 0.1] },
+  { id: 'fence-west', type: 'BOX', center: [-5.8, 0], halfSize: [0.1, 5.8] },
+  { id: 'fence-east', type: 'BOX', center: [5.8, 0], halfSize: [0.1, 5.8] },
+];
+
 export interface TrajectoryPoint {
   position: [number, number, number];
   scale: number;
@@ -29,6 +74,7 @@ export interface TrajectoryOptions {
   isLob?: boolean;
   distanceMultiplier?: number;
   apexHeightMultiplier?: number;
+  obstacles?: ObstacleCollider[];
 }
 
 /**
@@ -125,10 +171,11 @@ export function calculateTrajectory(
   const groundY = 0.006;
   let closestHitDistance = totalDistance;
   let hitTarget: TargetSphere | null = null;
+  let hitObstacle: ObstacleCollider | null = null;
   let impactPoint: [number, number, number] | undefined;
   let normalVec: { x: number; z: number } | undefined;
 
-  // 2D horizontal raycast circle intersection against target marbles
+  // 1. Raycast circle intersection against target marbles
   for (const target of targets) {
     const cX = target.position[0];
     const cZ = target.position[2];
@@ -147,6 +194,7 @@ export function calculateTrajectory(
     if (hitDist > 0 && hitDist < closestHitDistance) {
       closestHitDistance = hitDist;
       hitTarget = target;
+      hitObstacle = null;
 
       const impX = origin.x + uX * hitDist;
       const impZ = origin.z + uZ * hitDist;
@@ -160,7 +208,85 @@ export function calculateTrajectory(
     }
   }
 
-  const primaryDistance = hitTarget ? closestHitDistance : totalDistance;
+  // 2. Raycast circle and box intersections against static obstacles (rocks, pots, trees, fences)
+  const activeObstacles = options?.obstacles ?? PEKARANGAN_OBSTACLES;
+  for (const obs of activeObstacles) {
+    if (obs.type === 'CIRCLE' && obs.radius) {
+      const cX = obs.center[0];
+      const cZ = obs.center[1];
+      const effRadius = obs.radius + shooterRadius;
+
+      const vX = cX - origin.x;
+      const vZ = cZ - origin.z;
+
+      const proj = vX * uX + vZ * uZ;
+      if (proj <= 0) continue;
+
+      const perpSq = vX * vX + vZ * vZ - proj * proj;
+      if (perpSq > effRadius * effRadius) continue;
+
+      const hitDist = proj - Math.sqrt(Math.max(0, effRadius * effRadius - perpSq));
+      if (hitDist > 0 && hitDist < closestHitDistance) {
+        closestHitDistance = hitDist;
+        hitObstacle = obs;
+        hitTarget = null;
+
+        const impX = origin.x + uX * hitDist;
+        const impZ = origin.z + uZ * hitDist;
+        impactPoint = [impX, groundY, impZ];
+
+        // Normal points from obstacle center outwards to contact point
+        const normDist = Math.hypot(impX - cX, impZ - cZ) || 1;
+        normalVec = {
+          x: (impX - cX) / normDist,
+          z: (impZ - cZ) / normDist,
+        };
+      }
+    } else if (obs.type === 'BOX' && obs.halfSize) {
+      const cX = obs.center[0];
+      const cZ = obs.center[1];
+      const hX = obs.halfSize[0] + shooterRadius;
+      const hZ = obs.halfSize[1] + shooterRadius;
+
+      const minX = cX - hX;
+      const maxX = cX + hX;
+      const minZ = cZ - hZ;
+      const maxZ = cZ + hZ;
+
+      const invDirX = Math.abs(uX) > 1e-6 ? 1 / uX : 1e6;
+      const invDirZ = Math.abs(uZ) > 1e-6 ? 1 / uZ : 1e6;
+
+      let tMinX = (minX - origin.x) * invDirX;
+      let tMaxX = (maxX - origin.x) * invDirX;
+      if (tMinX > tMaxX) [tMinX, tMaxX] = [tMaxX, tMinX];
+
+      let tMinZ = (minZ - origin.z) * invDirZ;
+      let tMaxZ = (maxZ - origin.z) * invDirZ;
+      if (tMinZ > tMaxZ) [tMinZ, tMaxZ] = [tMaxZ, tMinZ];
+
+      const tEnter = Math.max(tMinX, tMinZ);
+      const tExit = Math.min(tMaxX, tMaxZ);
+
+      if (tEnter <= tExit && tEnter > 0 && tEnter < closestHitDistance) {
+        closestHitDistance = tEnter;
+        hitObstacle = obs;
+        hitTarget = null;
+
+        const impX = origin.x + uX * tEnter;
+        const impZ = origin.z + uZ * tEnter;
+        impactPoint = [impX, groundY, impZ];
+
+        if (tEnter === tMinX) {
+          normalVec = { x: uX > 0 ? -1 : 1, z: 0 };
+        } else {
+          normalVec = { x: 0, z: uZ > 0 ? -1 : 1 };
+        }
+      }
+    }
+  }
+
+  const isCollision = !!(hitTarget || hitObstacle);
+  const primaryDistance = isCollision ? closestHitDistance : totalDistance;
   const primaryStep = 0.12; // Segment spacing
   const primarySegments = Math.max(3, Math.floor(primaryDistance / primaryStep));
   const points: TrajectoryPoint[] = [];
@@ -177,12 +303,12 @@ export function calculateTrajectory(
     });
   }
 
-  // If target hit, compute secondary deflection angles (billiard physics preview)
+  // If collision occurs, compute deflection / bounce lines
   let targetKickPoints: TrajectoryPoint[] | undefined;
   let shooterDeflectPoints: TrajectoryPoint[] | undefined;
 
   if (hitTarget && impactPoint && normalVec) {
-    // Target kicks forward along contact normal
+    // Target marble kicks forward along contact normal
     const kickDist = 0.85;
     const kickSegments = 6;
     targetKickPoints = [];
@@ -225,6 +351,34 @@ export function calculateTrajectory(
         });
       }
     }
+  } else if (hitObstacle && impactPoint && normalVec) {
+    // Physical specular reflection off static obstacle (rock, pot, tree, wall)
+    // d_refl = u - 2 * (u . n) * n
+    const dot = uX * normalVec.x + uZ * normalVec.z;
+    const reflX = uX - 2 * dot * normalVec.x;
+    const reflZ = uZ - 2 * dot * normalVec.z;
+    const reflMag = Math.hypot(reflX, reflZ);
+
+    if (reflMag > 0.01) {
+      const normReflX = reflX / reflMag;
+      const normReflZ = reflZ / reflMag;
+      const bounceDist = 0.85;
+      const bounceSegments = 6;
+      shooterDeflectPoints = [];
+
+      for (let s = 1; s <= bounceSegments; s++) {
+        const d = (s / bounceSegments) * bounceDist;
+        shooterDeflectPoints.push({
+          position: [
+            impactPoint[0] + normReflX * d,
+            groundY,
+            impactPoint[2] + normReflZ * d,
+          ],
+          scale: 0.016,
+          alpha: 0.85 - (s / bounceSegments) * 0.45,
+        });
+      }
+    }
   }
 
   return {
@@ -235,7 +389,7 @@ export function calculateTrajectory(
       origin.y,
       origin.z + uZ * primaryDistance,
     ],
-    isHit: !!hitTarget,
+    isHit: isCollision,
     hitTargetId: hitTarget ? hitTarget.id : undefined,
     impactPoint,
     targetKickPoints,
