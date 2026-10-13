@@ -30,6 +30,7 @@ export function useSlingshot(
       if (aimingState !== 'IDLE') return;
 
       e.stopPropagation();
+      marbleAudio.startAmbientSound();
       setIsDragging(true);
       setAimingState('AIMING');
     },

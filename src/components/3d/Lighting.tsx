@@ -4,30 +4,37 @@ export const Lighting: React.FC = () => {
   return (
     <>
       {/* Warm ambient pekarangan */}
-      <ambientLight intensity={0.55} color="#fed7aa" />
+      <ambientLight intensity={0.65} color="#fed7aa" />
 
-      {/* Golden hour sun */}
+      {/* Golden hour late-afternoon sun */}
       <directionalLight
-        position={[6, 10, 5]}
-        intensity={1.8}
-        color="#ffedd5"
+        position={[7, 10, 6]}
+        intensity={2.2}
+        color="#fff1dd"
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-near={0.5}
-        shadow-camera-far={25}
-        shadow-camera-left={-5}
-        shadow-camera-right={5}
-        shadow-camera-top={5}
-        shadow-camera-bottom={-5}
-        shadow-bias={-0.0005}
+        shadow-camera-far={28}
+        shadow-camera-left={-8.5}
+        shadow-camera-right={8.5}
+        shadow-camera-top={8.5}
+        shadow-camera-bottom={-8.5}
+        shadow-bias={-0.0004}
       />
 
-      {/* Sky bounce */}
+      {/* Warm pekarangan bounce light (tropical golden haze to rich soil) */}
       <hemisphereLight
-        color="#fdba74"
-        groundColor="#451a03"
-        intensity={0.4}
+        color="#fef08a"
+        groundColor="#3d1d09"
+        intensity={0.55}
+      />
+
+      {/* Subtle opposite fill light for soft contrast under trees & fence */}
+      <directionalLight
+        position={[-7, 5, -6]}
+        intensity={0.35}
+        color="#fbcfe8"
       />
     </>
   );

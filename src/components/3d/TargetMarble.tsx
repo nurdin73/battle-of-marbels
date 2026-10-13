@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { RapierRigidBody, RigidBody } from '@react-three/rapier';
@@ -132,7 +132,18 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
     }
   };
 
-  const swirlColorObj = marble.swirlColor ? new THREE.Color(marble.swirlColor) : new THREE.Color('#ef4444');
+  const swirlColor = marble.swirlColor || '#ef4444';
+  const swirlColorObj = useMemo(() => new THREE.Color(swirlColor), [swirlColor]);
+
+  // Complementary accent color for dual cat-eye swirl vane
+  const secondarySwirlHex = useMemo(() => {
+    const c = new THREE.Color(swirlColor);
+    const hsl = { h: 0, s: 0, l: 0 };
+    c.getHSL(hsl);
+    hsl.h = (hsl.h + 0.12) % 1.0;
+    hsl.l = Math.min(0.82, hsl.l + 0.15);
+    return `#${new THREE.Color().setHSL(hsl.h, hsl.s, hsl.l).getHexString()}`;
+  }, [swirlColor]);
 
   return (
     <RigidBody
@@ -147,29 +158,49 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
       onCollisionEnter={handleCollision}
     >
       <group ref={groupRef}>
-        {/* Outer translucent glass shell */}
+        {/* Outer translucent optical glass shell */}
         <mesh castShadow receiveShadow>
-          <sphereGeometry args={[marble.radius, 32, 32]} />
+          <sphereGeometry args={[marble.radius, 36, 36]} />
           <meshPhysicalMaterial
-            roughness={0.05}
-            transmission={0.88}
-            thickness={0.6}
+            roughness={0.04}
+            transmission={0.92}
+            thickness={0.5}
             ior={1.52}
-            reflectivity={0.9}
+            reflectivity={0.92}
             clearcoat={1.0}
-            clearcoatRoughness={0.1}
+            clearcoatRoughness={0.04}
             attenuationColor={swirlColorObj}
-            attenuationDistance={0.3}
+            attenuationDistance={0.35}
           />
         </mesh>
 
-        {/* Inner colored glass swirl spiral */}
-        <mesh rotation={[0.4, 0.6, 0]}>
-          <torusGeometry args={[marble.radius * 0.45, marble.radius * 0.22, 16, 24]} />
+        {/* Primary Indonesian Cat-Eye Vane (Kelopak Belimbing Utama) */}
+        <mesh rotation={[0.45, 0.65, 0.2]}>
+          <torusGeometry args={[marble.radius * 0.5, marble.radius * 0.18, 16, 28]} />
           <meshStandardMaterial
-            color={marble.swirlColor || '#ef4444'}
-            roughness={0.3}
-            metalness={0.1}
+            color={swirlColor}
+            roughness={0.25}
+            metalness={0.15}
+          />
+        </mesh>
+
+        {/* Secondary Twisted Accent Vane (Kelopak Sayap Kedua) */}
+        <mesh rotation={[-0.45, -0.65, 0.85]}>
+          <torusGeometry args={[marble.radius * 0.44, marble.radius * 0.14, 16, 24]} />
+          <meshStandardMaterial
+            color={secondarySwirlHex}
+            roughness={0.28}
+            metalness={0.12}
+          />
+        </mesh>
+
+        {/* Central Core Molten Glass Bead */}
+        <mesh>
+          <sphereGeometry args={[marble.radius * 0.18, 12, 12]} />
+          <meshStandardMaterial
+            color={swirlColor}
+            roughness={0.2}
+            metalness={0.2}
           />
         </mesh>
       </group>

@@ -205,30 +205,52 @@ export const ShooterMarble: React.FC = () => {
     if (gacoanMaterial === 'GLASS_CLASSIC') {
       return (
         <group>
+          {/* Optical Clear Translucent Outer Glass Shell */}
           <mesh castShadow receiveShadow>
             <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
             <meshPhysicalMaterial
               roughness={0.03}
-              transmission={0.93}
-              thickness={0.8}
-              ior={1.54}
+              transmission={0.94}
+              thickness={0.55}
+              ior={1.53}
               reflectivity={0.95}
               clearcoat={1.0}
-              clearcoatRoughness={0.05}
+              clearcoatRoughness={0.03}
               attenuationColor={new THREE.Color('#38bdf8')}
-              attenuationDistance={0.4}
+              attenuationDistance={0.45}
             />
           </mesh>
-          <mesh rotation={[0.5, 0.3, 0]}>
+
+          {/* Primary Swirl Ribbon (Cobalt Blue Belimbing Vane) */}
+          <mesh rotation={[0.48, 0.35, 0.15]}>
             <torusGeometry
               args={[
-                ARENA_CONFIG.marbleRadius * 0.48,
-                ARENA_CONFIG.marbleRadius * 0.22,
+                ARENA_CONFIG.marbleRadius * 0.52,
+                ARENA_CONFIG.marbleRadius * 0.18,
+                16,
+                28,
+              ]}
+            />
+            <meshStandardMaterial color="#0284c7" roughness={0.2} metalness={0.2} />
+          </mesh>
+
+          {/* Counter-Swirl Ribbon (Electric Cyan Vane) */}
+          <mesh rotation={[-0.45, -0.55, 0.9]}>
+            <torusGeometry
+              args={[
+                ARENA_CONFIG.marbleRadius * 0.46,
+                ARENA_CONFIG.marbleRadius * 0.14,
                 16,
                 24,
               ]}
             />
-            <meshStandardMaterial color="#0284c7" roughness={0.2} metalness={0.2} />
+            <meshStandardMaterial color="#38bdf8" roughness={0.25} metalness={0.15} />
+          </mesh>
+
+          {/* Central Molten Amber Nucleus */}
+          <mesh>
+            <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 0.18, 12, 12]} />
+            <meshStandardMaterial color="#f59e0b" roughness={0.2} metalness={0.3} />
           </mesh>
         </group>
       );
@@ -236,18 +258,32 @@ export const ShooterMarble: React.FC = () => {
 
     if (gacoanMaterial === 'MARBLE_STONE') {
       return (
-        <mesh castShadow receiveShadow>
-          <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
-          <meshStandardMaterial color="#f1f5f9" roughness={0.35} metalness={0.05} />
-        </mesh>
+        <group>
+          <mesh castShadow receiveShadow>
+            <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+            <meshStandardMaterial color="#e2e8f0" roughness={0.38} metalness={0.05} />
+          </mesh>
+          {/* Subtle natural stone sedimentary banding */}
+          <mesh rotation={[0.6, 0.4, 0]}>
+            <torusGeometry
+              args={[
+                ARENA_CONFIG.marbleRadius * 0.92,
+                ARENA_CONFIG.marbleRadius * 0.08,
+                12,
+                32,
+              ]}
+            />
+            <meshStandardMaterial color="#94a3b8" roughness={0.45} />
+          </mesh>
+        </group>
       );
     }
 
-    // BEARING_STEEL
+    // BEARING_STEEL: Polished mirror steel ball
     return (
       <mesh castShadow receiveShadow>
         <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.12} metalness={0.98} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.06} metalness={0.98} />
       </mesh>
     );
   };

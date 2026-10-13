@@ -7,6 +7,7 @@ import { ShooterMarble } from './ShooterMarble';
 import { TargetMarble } from './TargetMarble';
 import { TrajectoryLine } from './TrajectoryLine';
 import { CameraController } from './CameraController';
+import { PekaranganProps } from './PekaranganProps';
 import { useGameStore } from '../../store/useGameStore';
 
 export const SceneContainer: React.FC = () => {
@@ -17,16 +18,17 @@ export const SceneContainer: React.FC = () => {
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, 2.6, 4.2], fov: 48 }}
+        camera={{ position: [0, 2.2, 3.8], fov: 50 }}
         gl={{ antialias: true, alpha: false }}
       >
-        <color attach="background" args={['#1c1917']} />
-        <fog attach="fog" args={['#1c1917', 8, 20]} />
+        <color attach="background" args={['#241913']} />
+        <fog attach="fog" args={['#241913', 12, 30]} />
 
         <Suspense fallback={null}>
           <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
             <Lighting />
             <ArenaGround />
+            <PekaranganProps />
             <ShooterMarble />
 
             {/* Target Marbles Cluster */}

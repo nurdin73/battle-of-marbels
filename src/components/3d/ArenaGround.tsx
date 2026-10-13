@@ -17,29 +17,22 @@ export const ArenaGround: React.FC = () => {
         <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[ARENA_CONFIG.groundSize, ARENA_CONFIG.groundSize]} />
           <meshStandardMaterial
-            color="#78350f"
-            roughness={0.88}
+            color="#5c2f16"
+            roughness={0.92}
             metalness={0.02}
           />
         </mesh>
 
-        {/* Outer arena walls (low invisible & visible wooden curb) */}
-        {/* North Wall */}
-        <CuboidCollider args={[boundaryHalfSize, 0.5, 0.2]} position={[0, 0.5, -boundaryHalfSize]} />
-        {/* South Wall */}
-        <CuboidCollider args={[boundaryHalfSize, 0.5, 0.2]} position={[0, 0.5, boundaryHalfSize]} />
-        {/* East Wall */}
-        <CuboidCollider args={[0.2, 0.5, boundaryHalfSize]} position={[boundaryHalfSize, 0.5, 0]} />
-        {/* West Wall */}
-        <CuboidCollider args={[0.2, 0.5, boundaryHalfSize]} position={[-boundaryHalfSize, 0.5, 0]} />
+        {/* South boundary wall behind player */}
+        <CuboidCollider args={[6.0, 0.5, 0.2]} position={[0, 0.5, 6.0]} />
       </RigidBody>
 
-      {/* Decorative Ground Soil Circle (inner pekarangan circle) */}
+      {/* Decorative Ground Soil Circle (subtle swept play ring area) */}
       <mesh receiveShadow position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[ringRadius * 1.5, 48]} />
+        <circleGeometry args={[ringRadius * 1.35, 48]} />
         <meshStandardMaterial
-          color="#92400e"
-          roughness={0.92}
+          color="#6e391b"
+          roughness={0.94}
         />
       </mesh>
 
@@ -55,21 +48,9 @@ export const ArenaGround: React.FC = () => {
         <meshBasicMaterial color="#fef08a" transparent opacity={0.4} />
       </mesh>
 
-      {/* Low wooden border curb visuals */}
-      <mesh position={[0, 0.15, -boundaryHalfSize]}>
-        <boxGeometry args={[ARENA_CONFIG.groundSize, 0.3, 0.2]} />
-        <meshStandardMaterial color="#451a03" roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 0.15, boundaryHalfSize]}>
-        <boxGeometry args={[ARENA_CONFIG.groundSize, 0.3, 0.2]} />
-        <meshStandardMaterial color="#451a03" roughness={0.7} />
-      </mesh>
-      <mesh position={[boundaryHalfSize, 0.15, 0]}>
-        <boxGeometry args={[0.2, 0.3, ARENA_CONFIG.groundSize]} />
-        <meshStandardMaterial color="#451a03" roughness={0.7} />
-      </mesh>
-      <mesh position={[-boundaryHalfSize, 0.15, 0]}>
-        <boxGeometry args={[0.2, 0.3, ARENA_CONFIG.groundSize]} />
+      {/* South wooden border curb behind player */}
+      <mesh position={[0, 0.12, 6.0]}>
+        <boxGeometry args={[12.0, 0.24, 0.2]} />
         <meshStandardMaterial color="#451a03" roughness={0.7} />
       </mesh>
     </group>

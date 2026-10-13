@@ -47,7 +47,7 @@ export const HUDOverlay: React.FC = () => {
               <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-neutral-100 flex items-center gap-2">
                 KELERENG CLASH <span className="text-sky-400 font-mono text-xs px-1.5 py-0.5 rounded bg-sky-950/60 border border-sky-500/30">3D</span>
               </h1>
-              <p className="text-[10px] text-neutral-400 font-medium">Sprint 3 • Kartu Taktis & Energi Kapur</p>
+              <p className="text-[10px] text-neutral-400 font-medium">Sprint 4 • Pekarangan Tradisional & Audio Atmosferik</p>
             </div>
           </div>
 
