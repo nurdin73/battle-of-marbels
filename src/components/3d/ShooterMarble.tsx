@@ -1,0 +1,265 @@
+import React, { useEffect, useRef } from 'react';
+import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
+import { RapierRigidBody, RigidBody } from '@react-three/rapier';
+import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS } from '../../constants/physics.constants';
+import { useGameStore } from '../../store/useGameStore';
+import { useSlingshot } from '../../hooks/useSlingshot';
+import { marbleAudio } from '../../utils/soundSynth.utils';
+
+const INITIAL_SHOOTER_POS: [number, number, number] = [0, ARENA_CONFIG.marbleRadius, 2.3];
+
+export const ShooterMarble: React.FC = () => {
+  const rigidBodyRef = useRef<RapierRigidBody>(null);
+  const stillFrameCountRef = useRef<number>(0);
+  const flightProgressRef = useRef<number>(0);
+
+  const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
+  const aimingState = useGameStore((s) => s.aimingState);
+  const setAimingState = useGameStore((s) => s.setAimingState);
+  const updateGacoanPos = useGameStore((s) => s.updateGacoanPos);
+  const triggerEvaluation = useGameStore((s) => s.triggerEvaluation);
+  const resetRevision = useGameStore((s) => s.resetRevision);
+  const flightData = useGameStore((s) => s.flightData);
+  const setFlightData = useGameStore((s) => s.setFlightData);
+
+  const evaluationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const physicalConfig = MARBLE_PHYSICAL_CONFIGS[gacoanMaterial];
+
+  const { onPointerDown } = useSlingshot(rigidBodyRef);
+
+  // Reset gacoan upon arena reset
+  useEffect(() => {
+    if (evaluationTimerRef.current) {
+      clearTimeout(evaluationTimerRef.current);
+      evaluationTimerRef.current = null;
+    }
+    flightProgressRef.current = 0;
+
+    if (rigidBodyRef.current) {
+      rigidBodyRef.current.setTranslation(
+        {
+          x: INITIAL_SHOOTER_POS[0],
+          y: INITIAL_SHOOTER_POS[1],
+          z: INITIAL_SHOOTER_POS[2],
+        },
+        true
+      );
+      rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      stillFrameCountRef.current = 0;
+      updateGacoanPos(INITIAL_SHOOTER_POS);
+    }
+  }, [resetRevision, updateGacoanPos]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (evaluationTimerRef.current) {
+        clearTimeout(evaluationTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Sync gacoan position & monitor velocity during SIMULATING phase
+  useFrame((_, delta) => {
+    if (!rigidBodyRef.current) return;
+
+    // Handle smooth 3D arching flight during AIRBORNE phase
+    if (aimingState === 'AIRBORNE') {
+      if (!flightData) {
+        setAimingState('SIMULATING');
+        return;
+      }
+
+      const duration = flightData.duration > 0 ? flightData.duration : 0.72;
+      flightProgressRef.current += delta / duration;
+      const t = Math.min(flightProgressRef.current, 1.0);
+
+      const ox = flightData.origin[0];
+      const oy = flightData.origin[1];
+      const oz = flightData.origin[2];
+
+      const lx = flightData.landingPoint[0];
+      const ly = flightData.landingPoint[1];
+      const lz = flightData.landingPoint[2];
+
+      // Parabolic formula matching TrajectoryLine exactly
+      const currentX = ox + t * (lx - ox);
+      const currentZ = oz + t * (lz - oz);
+      const currentY = oy + 4 * flightData.apexHeight * t * (1 - t);
+
+      rigidBodyRef.current.setTranslation({ x: currentX, y: currentY, z: currentZ }, true);
+      updateGacoanPos([currentX, currentY, currentZ]);
+
+      if (t >= 1.0) {
+        // Impact & Physics Handover!
+        flightProgressRef.current = 0;
+        rigidBodyRef.current.setTranslation({ x: lx, y: ly, z: lz }, true);
+        rigidBodyRef.current.wakeUp();
+
+        const speed = flightData.impulseMagnitude / physicalConfig.mass;
+        const dirX = flightData.direction.x;
+        const dirZ = flightData.direction.z;
+
+        // Compute natural forward rolling angular velocity (omega = v / r)
+        const forwardSpeed = flightData.isHit ? speed * 0.95 : speed * 0.90;
+        const rollSpeed = forwardSpeed / ARENA_CONFIG.marbleRadius;
+        const angvelX = dirZ * rollSpeed;
+        const angvelZ = -dirX * rollSpeed;
+
+        if (flightData.isHit) {
+          // Energetic elastic collision into target marbles
+          rigidBodyRef.current.setLinvel({ x: dirX * forwardSpeed, y: 0.05, z: dirZ * forwardSpeed }, true);
+          rigidBodyRef.current.setAngvel({ x: angvelX * 0.6, y: 0.0, z: angvelZ * 0.6 }, true);
+          marbleAudio.playCollisionSound({
+            materialType: gacoanMaterial,
+            relativeVelocity: speed,
+          });
+        } else {
+          // Landing on pekarangan ground with natural roll and crisp contact bounce
+          rigidBodyRef.current.setLinvel({ x: dirX * forwardSpeed, y: 0.08, z: dirZ * forwardSpeed }, true);
+          rigidBodyRef.current.setAngvel({ x: angvelX, y: 0.0, z: angvelZ }, true);
+          marbleAudio.playCollisionSound({
+            materialType: gacoanMaterial,
+            relativeVelocity: speed * 0.45,
+          });
+        }
+
+        setAimingState('SIMULATING');
+        setFlightData(null);
+      }
+      return;
+    }
+
+    const translation = rigidBodyRef.current.translation();
+    updateGacoanPos([translation.x, translation.y, translation.z]);
+
+    if (aimingState !== 'SIMULATING') {
+      stillFrameCountRef.current = 0;
+      return;
+    }
+
+    const linvel = rigidBodyRef.current.linvel();
+    const speed = Math.hypot(linvel.x, linvel.y, linvel.z);
+
+    if (speed < ARENA_CONFIG.restVelocityThreshold) {
+      stillFrameCountRef.current += 1;
+      // Require 20 consecutive resting frames (~0.33s) to confirm complete stop
+      if (stillFrameCountRef.current > 20) {
+        setAimingState('EVALUATING');
+        stillFrameCountRef.current = 0;
+
+        if (evaluationTimerRef.current) {
+          clearTimeout(evaluationTimerRef.current);
+        }
+
+        // Wait exactly 2 seconds after gacoan stops before triggering pocketing evaluation
+        evaluationTimerRef.current = setTimeout(() => {
+          triggerEvaluation();
+          // Give brief 400ms buffer for shrink animation before re-enabling aim
+          setTimeout(() => {
+            setAimingState('IDLE');
+          }, 400);
+        }, 2000);
+      }
+    } else {
+      stillFrameCountRef.current = 0;
+    }
+  });
+
+  const handleCollision = () => {
+    const linvel = rigidBodyRef.current?.linvel();
+    const speed = linvel ? Math.hypot(linvel.x, linvel.y, linvel.z) : 0.8;
+    if (speed > 0.05) {
+      marbleAudio.playCollisionSound({
+        materialType: gacoanMaterial,
+        relativeVelocity: speed,
+      });
+    }
+  };
+
+  const renderMaterial = () => {
+    if (gacoanMaterial === 'GLASS_CLASSIC') {
+      return (
+        <group>
+          <mesh castShadow receiveShadow>
+            <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+            <meshPhysicalMaterial
+              roughness={0.03}
+              transmission={0.93}
+              thickness={0.8}
+              ior={1.54}
+              reflectivity={0.95}
+              clearcoat={1.0}
+              clearcoatRoughness={0.05}
+              attenuationColor={new THREE.Color('#38bdf8')}
+              attenuationDistance={0.4}
+            />
+          </mesh>
+          <mesh rotation={[0.5, 0.3, 0]}>
+            <torusGeometry
+              args={[
+                ARENA_CONFIG.marbleRadius * 0.48,
+                ARENA_CONFIG.marbleRadius * 0.22,
+                16,
+                24,
+              ]}
+            />
+            <meshStandardMaterial color="#0284c7" roughness={0.2} metalness={0.2} />
+          </mesh>
+        </group>
+      );
+    }
+
+    if (gacoanMaterial === 'MARBLE_STONE') {
+      return (
+        <mesh castShadow receiveShadow>
+          <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+          <meshStandardMaterial color="#f1f5f9" roughness={0.35} metalness={0.05} />
+        </mesh>
+      );
+    }
+
+    // BEARING_STEEL
+    return (
+      <mesh castShadow receiveShadow>
+        <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+        <meshStandardMaterial color="#94a3b8" roughness={0.12} metalness={0.98} />
+      </mesh>
+    );
+  };
+
+  return (
+    <RigidBody
+      ref={rigidBodyRef}
+      colliders="ball"
+      ccd={true}
+      position={INITIAL_SHOOTER_POS}
+      mass={physicalConfig.mass}
+      restitution={physicalConfig.restitution}
+      friction={physicalConfig.frictionDynamic}
+      linearDamping={physicalConfig.linearDamping}
+      angularDamping={physicalConfig.angularDamping}
+      onCollisionEnter={handleCollision}
+    >
+      <group onPointerDown={onPointerDown}>
+        {/* Generous invisible hit target for effortless click & touch capture */}
+        <mesh>
+          <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 2.5, 16, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+
+        {renderMaterial()}
+
+        {/* Pulsing selection ring when IDLE */}
+        {aimingState === 'IDLE' && (
+          <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[ARENA_CONFIG.marbleRadius * 1.3, ARENA_CONFIG.marbleRadius * 1.5, 32]} />
+            <meshBasicMaterial color="#38bdf8" transparent opacity={0.6} />
+          </mesh>
+        )}
+      </group>
+    </RigidBody>
+  );
+};
