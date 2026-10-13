@@ -8,7 +8,6 @@ import { TargetMarble } from './TargetMarble';
 import { TrajectoryLine } from './TrajectoryLine';
 import { CameraController } from './CameraController';
 import { PekaranganProps } from './PekaranganProps';
-import { BananaTrees } from './BananaTree';
 import { PekaranganGrass } from './PekaranganGrass';
 import { LevelObstacles } from './LevelObstacles';
 import { useGameStore } from '../../store/useGameStore';
@@ -32,7 +31,6 @@ export const SceneContainer: React.FC = () => {
             <Lighting />
             <ArenaGround />
             <PekaranganProps />
-            <BananaTrees />
             <PekaranganGrass />
             <LevelObstacles />
             <ShooterMarble />

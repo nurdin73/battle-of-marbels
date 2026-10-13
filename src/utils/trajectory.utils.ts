@@ -45,11 +45,6 @@ export const PEKARANGAN_OBSTACLES: ObstacleCollider[] = [
   { id: 'tree-0', type: 'CIRCLE', center: [-4.2, -4.5], radius: 0.38 },
   { id: 'tree-1', type: 'CIRCLE', center: [4.2, -4.2], radius: 0.28 },
 
-  // Banana Tree Clumps (Pohon Pisang)
-  { id: 'banana-0', type: 'CIRCLE', center: [-3.8, -3.8], radius: 0.32 },
-  { id: 'banana-1', type: 'CIRCLE', center: [3.9, -1.2], radius: 0.30 },
-  { id: 'banana-2', type: 'CIRCLE', center: [3.6, -4.2], radius: 0.30 },
-
   // Bamboo fences (Cuboid Colliders)
   { id: 'fence-north', type: 'BOX', center: [0, -5.8], halfSize: [5.8, 0.1] },
   { id: 'fence-west', type: 'BOX', center: [-5.8, 0], halfSize: [0.1, 5.8] },
