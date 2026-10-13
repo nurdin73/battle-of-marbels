@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { ARENA_CONFIG } from '../../constants/physics.constants';
+import { createChalkRingTexture } from '../../utils/chalkTexture.utils';
 
 interface DirtPatch {
   x: number;
@@ -17,6 +18,7 @@ useTexture.preload(GROUND_TEXTURE_URL);
 export const ArenaGround: React.FC = () => {
   const ringRadius = ARENA_CONFIG.ringRadius;
   const boundaryHalfSize = ARENA_CONFIG.groundSize / 2;
+  const chalkPlaneSize = ringRadius * 2 + 0.8;
 
   const groundTexture = useTexture(GROUND_TEXTURE_URL);
 
@@ -26,6 +28,16 @@ export const ArenaGround: React.FC = () => {
     groundTexture.repeat.set(5, 5);
     groundTexture.colorSpace = THREE.SRGBColorSpace;
   }, [groundTexture]);
+
+  const chalkTexture = useMemo(() => {
+    return createChalkRingTexture(ringRadius, chalkPlaneSize);
+  }, [ringRadius, chalkPlaneSize]);
+
+  useEffect(() => {
+    return () => {
+      chalkTexture.dispose();
+    };
+  }, [chalkTexture]);
 
   // Organic flat soil patches creating natural dirt variation without protruding into marbles
   const dirtPatches = useMemo<DirtPatch[]>(() => [
@@ -118,16 +130,14 @@ export const ArenaGround: React.FC = () => {
         />
       </mesh>
 
-      {/* 5. Chalk Ring Ground Glow / Ribbon */}
-      <mesh position={[0, 0.0025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[ringRadius - 0.03, ringRadius + 0.03, 64]} />
-        <meshBasicMaterial color="#fef08a" transparent opacity={0.35} />
-      </mesh>
-
-      {/* 6. Chalk Ring Marker Line */}
+      {/* 5. Authentic Chalk Ring Marker (Procedural chalk dust & stroke on dirt) */}
       <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[ringRadius - 0.015, ringRadius + 0.015, 64]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
+        <planeGeometry args={[chalkPlaneSize, chalkPlaneSize]} />
+        <meshBasicMaterial
+          map={chalkTexture}
+          transparent
+          depthWrite={false}
+        />
       </mesh>
 
       {/* 7. South wooden border curb behind player */}
