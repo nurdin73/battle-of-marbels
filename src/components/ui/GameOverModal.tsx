@@ -1,21 +1,56 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useGameStore } from '../../store/useGameStore';
-import { Trophy, Star, RotateCcw, Target, Zap } from 'lucide-react';
-import { GAMEPLAY_CONFIG } from '../../constants/physics.constants';
+import { useLevelStore } from '../../store/useLevelStore';
+import { ADVENTURE_LEVELS } from '../../constants/levels.constants';
+import { Trophy, Star, RotateCcw, Target, Zap, ArrowRight, Compass } from 'lucide-react';
 
 export const GameOverModal: React.FC = () => {
   const isGameOver = useGameStore((s) => s.isGameOver);
   const score = useGameStore((s) => s.score);
   const flickCount = useGameStore((s) => s.flickCount);
   const starsAwarded = useGameStore((s) => s.starsAwarded);
+  const currentPar = useGameStore((s) => s.currentPar);
+  const targetMarbles = useGameStore((s) => s.targetMarbles);
   const restartGame = useGameStore((s) => s.restartGame);
+  const loadLevelConfig = useGameStore((s) => s.loadLevelConfig);
+
+  const currentLevelId = useLevelStore((s) => s.currentLevelId);
+  const selectLevel = useLevelStore((s) => s.selectLevel);
+  const recordLevelCompletion = useLevelStore((s) => s.recordLevelCompletion);
+  const openLevelSelectModal = useLevelStore((s) => s.openLevelSelectModal);
+
+  const currentLevelIndex = ADVENTURE_LEVELS.findIndex((l) => l.id === currentLevelId);
+  const currentLevel = ADVENTURE_LEVELS[currentLevelIndex] || ADVENTURE_LEVELS[0];
+  const nextLevel = currentLevelIndex !== -1 && currentLevelIndex < ADVENTURE_LEVELS.length - 1
+    ? ADVENTURE_LEVELS[currentLevelIndex + 1]
+    : null;
+
+  // Record completion to persistent storage on win
+  useEffect(() => {
+    if (isGameOver) {
+      recordLevelCompletion(currentLevelId, flickCount);
+    }
+  }, [isGameOver, currentLevelId, flickCount, recordLevelCompletion]);
 
   if (!isGameOver) return null;
+
+  const handleNextLevel = () => {
+    if (!nextLevel) {
+      openLevelSelectModal();
+      return;
+    }
+    selectLevel(nextLevel.id);
+    loadLevelConfig(nextLevel);
+  };
+
+  const handleReplayLevel = () => {
+    loadLevelConfig(currentLevel);
+  };
 
   return (
     <div
       data-testid="game-over-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"
     >
       <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl text-center flex flex-col items-center">
         {/* Glowing Trophy Badge */}
@@ -23,11 +58,15 @@ export const GameOverModal: React.FC = () => {
           <Trophy className="w-9 h-9 text-neutral-950" />
         </div>
 
+        <div className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[11px] font-bold mb-2">
+          LEVEL {currentLevel.levelNumber} SELESAI
+        </div>
+
         <h2 className="text-xl sm:text-2xl font-black text-neutral-100 tracking-tight">
-          ARENA DIBERSIHKAN!
+          {currentLevel.title.toUpperCase()}
         </h2>
         <p className="text-xs sm:text-sm text-neutral-400 mt-1 mb-5 font-medium">
-          Seluruh 9 kelereng target berhasil dikeluarkan dari ring.
+          Seluruh {targetMarbles.length} kelereng target berhasil dibersihkan!
         </p>
 
         {/* 3 Stars Display */}
@@ -59,10 +98,10 @@ export const GameOverModal: React.FC = () => {
             <Target className="w-4 h-4 text-sky-400 shrink-0" />
             <div>
               <span className="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold block">
-                Total Skor
+                Target Bersih
               </span>
               <span className="text-sm font-bold text-neutral-100 font-mono">
-                {score} / {GAMEPLAY_CONFIG.initialTargetCount}
+                {score} / {targetMarbles.length}
               </span>
             </div>
           </div>
@@ -76,22 +115,47 @@ export const GameOverModal: React.FC = () => {
               <span className="text-sm font-bold text-neutral-100 font-mono">
                 {flickCount}{' '}
                 <span className="text-[10px] text-neutral-500 font-normal">
-                  (Par: {GAMEPLAY_CONFIG.parFlicks})
+                  (Par: {currentPar})
                 </span>
               </span>
             </div>
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          data-testid="restart-game-btn"
-          onClick={restartGame}
-          className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 active:scale-95 transition-all cursor-pointer"
-        >
-          <RotateCcw className="w-4 h-4" />
-          <span>Main Babak Baru</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2.5 w-full">
+          {nextLevel ? (
+            <button
+              data-testid="next-level-btn"
+              onClick={handleNextLevel}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+            >
+              <span>Lanjut ke Level {nextLevel.levelNumber}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              data-testid="all-levels-clear-btn"
+              onClick={() => {
+                restartGame();
+                openLevelSelectModal();
+              }}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-neutral-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            >
+              <Compass className="w-4 h-4" />
+              <span>Semua Level Bersih! Pilih Level</span>
+            </button>
+          )}
+
+          <button
+            data-testid="replay-level-btn"
+            onClick={handleReplayLevel}
+            className="w-full py-2.5 px-6 rounded-2xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Ulangi Level Ini</span>
+          </button>
+        </div>
       </div>
     </div>
   );

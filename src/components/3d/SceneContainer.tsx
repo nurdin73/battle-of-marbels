@@ -8,6 +8,7 @@ import { TargetMarble } from './TargetMarble';
 import { TrajectoryLine } from './TrajectoryLine';
 import { CameraController } from './CameraController';
 import { PekaranganProps } from './PekaranganProps';
+import { LevelObstacles } from './LevelObstacles';
 import { useGameStore } from '../../store/useGameStore';
 
 export const SceneContainer: React.FC = () => {
@@ -29,6 +30,7 @@ export const SceneContainer: React.FC = () => {
             <Lighting />
             <ArenaGround />
             <PekaranganProps />
+            <LevelObstacles />
             <ShooterMarble />
 
             {/* Target Marbles Cluster */}

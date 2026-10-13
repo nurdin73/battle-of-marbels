@@ -36,6 +36,7 @@ interface GameStoreState {
   isTimerActive: boolean;
   isGameOver: boolean;
   starsAwarded: number;
+  currentPar: number;
   lastTurnOutcome: TurnEvaluationOutcome | null;
   targetsPocketedThisTurn: number;
   isMuted: boolean;
@@ -45,6 +46,7 @@ interface GameStoreState {
   flightData: ActiveFlightData | null;
 
   // Actions
+  loadLevelConfig: (level: import('../types/level.types').LevelConfig) => void;
   setAimingState: (state: AimingState) => void;
   setGacoanMaterial: (material: MarbleMaterialType) => void;
   updateGacoanPos: (pos: [number, number, number]) => void;
@@ -121,6 +123,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   isTimerActive: true,
   isGameOver: false,
   starsAwarded: 0,
+  currentPar: GAMEPLAY_CONFIG.parFlicks,
   lastTurnOutcome: null,
   targetsPocketedThisTurn: 0,
   isMuted: false,
@@ -303,14 +306,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     // Regenerate +1 chalk energy for new turn
     useCardStore.getState().regenerateChalk(1);
 
-    // Check Win Condition: All 9 target marbles pocketed
-    const isGameOver = finalScore >= GAMEPLAY_CONFIG.initialTargetCount;
+    // Check Win Condition: All target marbles pocketed for current level
+    const totalTargets = state.targetMarbles.length;
+    const isGameOver = finalScore >= totalTargets;
     let starsAwarded = 0;
     if (isGameOver) {
       marbleAudio.playVictorySound();
-      if (state.flickCount <= GAMEPLAY_CONFIG.parFlicks) {
+      const par = state.currentPar || GAMEPLAY_CONFIG.parFlicks;
+      if (state.flickCount <= par) {
         starsAwarded = 3;
-      } else if (state.flickCount <= GAMEPLAY_CONFIG.parFlicks + 3) {
+      } else if (state.flickCount <= par + 2) {
         starsAwarded = 2;
       } else {
         starsAwarded = 1;
@@ -347,6 +352,36 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set((state) => ({
       showTrajectory: !state.showTrajectory,
     })),
+
+  loadLevelConfig: (level) => {
+    useCardStore.getState().resetCardStore();
+    set((state) => ({
+      aimingState: 'IDLE',
+      currentPar: level.par,
+      targetMarbles: level.targets,
+      gacoanCurrentPos: level.initialGacoanPos,
+      targetLivePositions: {},
+      preShotTargetPositions: {},
+      drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
+      marblesOutsideRing: [],
+      targetsPocketedThisTurnIds: [],
+      foulRestoredIds: [],
+      foulRestoreRevision: 0,
+      score: 0,
+      flickCount: 0,
+      turnCount: 1,
+      comboStreak: 0,
+      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: true,
+      isGameOver: false,
+      starsAwarded: 0,
+      lastTurnOutcome: null,
+      targetsPocketedThisTurn: 0,
+      resetRevision: state.resetRevision + 1,
+      evaluationEpoch: 0,
+      flightData: null,
+    }));
+  },
 
   resetArena: () =>
     set((state) => ({
