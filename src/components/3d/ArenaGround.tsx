@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { CuboidCollider, RigidBody } from '@react-three/rapier';
+import { useTexture } from '@react-three/drei';
+import * as THREE from 'three';
 import { ARENA_CONFIG } from '../../constants/physics.constants';
 
 interface DirtPatch {
@@ -9,9 +11,21 @@ interface DirtPatch {
   color: string;
 }
 
+const GROUND_TEXTURE_URL = '/assets/textures/ground.webp';
+useTexture.preload(GROUND_TEXTURE_URL);
+
 export const ArenaGround: React.FC = () => {
   const ringRadius = ARENA_CONFIG.ringRadius;
   const boundaryHalfSize = ARENA_CONFIG.groundSize / 2;
+
+  const groundTexture = useTexture(GROUND_TEXTURE_URL);
+
+  useMemo(() => {
+    groundTexture.wrapS = THREE.RepeatWrapping;
+    groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(5, 5);
+    groundTexture.colorSpace = THREE.SRGBColorSpace;
+  }, [groundTexture]);
 
   // Organic flat soil patches creating natural dirt variation without protruding into marbles
   const dirtPatches = useMemo<DirtPatch[]>(() => [
@@ -48,11 +62,11 @@ export const ArenaGround: React.FC = () => {
         {/* Solid Ground Plane Collider: Top surface exactly at Y = 0.0 */}
         <CuboidCollider args={[boundaryHalfSize, 0.05, boundaryHalfSize]} position={[0, -0.05, 0]} />
 
-        {/* Base flat yard soil plane */}
+        {/* Base flat yard soil plane with texture mapping */}
         <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[ARENA_CONFIG.groundSize, ARENA_CONFIG.groundSize]} />
           <meshStandardMaterial
-            color="#5c2f16"
+            map={groundTexture}
             roughness={0.92}
             metalness={0.02}
           />
@@ -62,7 +76,7 @@ export const ArenaGround: React.FC = () => {
         <CuboidCollider args={[6.0, 0.5, 0.2]} position={[0, 0.5, 6.0]} />
       </RigidBody>
 
-      {/* 2. Flat Organic Soil Patches (Flush with ground at Y = 0.001 to prevent marble sinking) */}
+      {/* 2. Flat Organic Soil Patches (Blended smoothly with base texture at Y = 0.001) */}
       <group name="dirt-patches">
         {dirtPatches.map((patch, idx) => (
           <mesh
@@ -75,17 +89,21 @@ export const ArenaGround: React.FC = () => {
             <meshStandardMaterial
               color={patch.color}
               roughness={0.95}
+              transparent
+              opacity={0.35}
             />
           </mesh>
         ))}
       </group>
 
-      {/* 3. Swept Traditional Play Ring (Tanah Bersih Disapu Rata) */}
+      {/* 3. Swept Traditional Play Ring (Tanah Bersih Disapu Rata - semi-transparan di atas tekstur) */}
       <mesh receiveShadow position={[0, 0.0015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[ringRadius * 1.05, 48]} />
         <meshStandardMaterial
           color="#6e391b"
           roughness={0.95}
+          transparent
+          opacity={0.45}
         />
       </mesh>
 
@@ -95,6 +113,8 @@ export const ArenaGround: React.FC = () => {
         <meshStandardMaterial
           color="#451a03"
           roughness={0.96}
+          transparent
+          opacity={0.4}
         />
       </mesh>
 
