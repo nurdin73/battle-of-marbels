@@ -20,7 +20,7 @@ export const PowerMeter: React.FC = () => {
     barColor = 'from-emerald-400 to-amber-400';
   }
 
-  const reachDistance = (0.8 + Math.pow(percentage / 100, 1.15) * 8.0).toFixed(1);
+  const reachDistance = (0.35 + Math.pow(percentage / 100, 1.35) * 3.65).toFixed(1);
 
   return (
     <div

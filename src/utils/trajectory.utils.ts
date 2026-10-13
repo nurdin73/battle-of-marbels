@@ -65,11 +65,11 @@ export function calculateTrajectory(
   const apexMult = options?.apexHeightMultiplier ?? 1.0;
 
   const powerNorm = Math.min(Math.max(powerPercentage / 100, 0), 1);
-  const totalDistance = (0.8 + Math.pow(powerNorm, 1.15) * 8.0) * distMult;
+  const totalDistance = (0.35 + Math.pow(powerNorm, 1.35) * 3.65) * distMult;
 
   // LOB MODE (Exclusive to CARD_LOB)
   if (isLob) {
-    const apexHeight = (0.18 + powerNorm * 0.65) * apexMult;
+    const apexHeight = (0.12 + powerNorm * 0.45) * apexMult;
     const segmentCount = 28;
     const points: TrajectoryPoint[] = [];
 
