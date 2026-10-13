@@ -1,52 +1,110 @@
-import React from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGameStore } from '../../store/useGameStore';
-import { Zap } from 'lucide-react';
 
 export const PowerMeter: React.FC = () => {
-  const drag = useGameStore((s) => s.drag);
   const aimingState = useGameStore((s) => s.aimingState);
+  const fireFlick = useGameStore((s) => s.fireFlick);
+  const cancelAiming = useGameStore((s) => s.cancelAiming);
+  const setOscillatingPower = useGameStore((s) => s.setOscillatingPower);
 
-  if (aimingState !== 'AIMING' || drag.distance < 0.03) {
+  const [displayPower, setDisplayPower] = useState(50);
+  const powerRef = useRef(50);
+
+  // Oscillating barometer animation loop during CHARGING
+  useEffect(() => {
+    if (aimingState !== 'CHARGING') {
+      return;
+    }
+
+    let animId: number;
+    const startTime = performance.now();
+    const periodMs = 1200; // 1.2s per complete 0 -> 100 -> 0 oscillation cycle
+
+    const loop = (now: number) => {
+      const elapsed = (now - startTime) % periodMs;
+      const halfPeriod = periodMs / 2;
+      let val: number;
+
+      if (elapsed <= halfPeriod) {
+        val = Math.round((elapsed / halfPeriod) * 100);
+      } else {
+        val = Math.round(((periodMs - elapsed) / halfPeriod) * 100);
+      }
+
+      val = Math.max(1, Math.min(100, val));
+      powerRef.current = val;
+      setDisplayPower(val);
+      setOscillatingPower(val);
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [aimingState, setOscillatingPower]);
+
+  const handleRelease = useCallback(() => {
+    if (aimingState !== 'CHARGING') return;
+    fireFlick(powerRef.current);
+  }, [aimingState, fireFlick]);
+
+  // Keyboard shortcut listeners (Spacebar to shoot, Escape to re-aim)
+  useEffect(() => {
+    if (aimingState !== 'CHARGING') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleRelease();
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        cancelAiming();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [aimingState, handleRelease, cancelAiming]);
+
+  if (aimingState !== 'CHARGING') {
     return null;
   }
 
-  const percentage = drag.percentage;
-
-  // Dynamic gradient color based on power
   let barColor = 'from-emerald-400 to-amber-300';
-  if (percentage > 70) {
-    barColor = 'from-amber-400 to-orange-500';
-  } else if (percentage > 40) {
+  if (displayPower > 75) {
+    barColor = 'from-amber-400 to-[#ff6242]';
+  } else if (displayPower > 40) {
     barColor = 'from-emerald-400 to-amber-400';
   }
-
-  const reachDistance = (0.35 + Math.pow(percentage / 100, 1.35) * 3.65).toFixed(1);
 
   return (
     <div
       data-testid="hud-power-meter"
-      className="absolute bottom-28 left-1/2 -translate-x-1/2 w-80 max-w-[90vw] timbul-card p-3.5 flex flex-col gap-2 transition-all animate-fade-in pointer-events-none"
+      onClick={handleRelease}
+      className="absolute bottom-28 left-1/2 -translate-x-1/2 w-64 sm:w-80 flex flex-col items-center gap-1.5 transition-all animate-fade-in pointer-events-auto select-none z-30 cursor-pointer"
+      title="Klik atau tekan Spasi untuk melepaskan sentilan"
     >
-      <div className="flex items-center justify-between text-xs font-black tracking-wider text-stone-700">
-        <span className="flex items-center gap-1.5 text-[#d54425]">
-          <Zap className="w-4 h-4 fill-[#ff6242] text-[#d54425]" />
-          TENAGA SENTIL 👆
-        </span>
-        <span className="font-mono text-stone-900 font-black">{percentage}%</span>
-      </div>
-
-      <div className="w-full h-3.5 bg-[#ede6dc] rounded-full overflow-hidden border border-[#ded5c7] p-0.5 shadow-inner">
+      {/* Floating Pure Progress Bar */}
+      <div className="relative w-full h-5 bg-[#ede6dc]/95 rounded-full overflow-hidden border-2 border-stone-800 shadow-[0_4px_12px_rgba(0,0,0,0.35)] p-0.5 backdrop-blur-xs">
         <div
           data-testid="hud-power-meter-fill"
-          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-75 shadow-sm`}
-          style={{ width: `${percentage}%` }}
+          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-none shadow-sm`}
+          style={{ width: `${displayPower}%` }}
+        />
+        {/* Moving Needle Indicator */}
+        <div
+          className="absolute top-0 bottom-0 w-2.5 bg-white border-2 border-stone-900 rounded-full shadow-md -translate-x-1/2 pointer-events-none"
+          style={{ left: `${displayPower}%` }}
         />
       </div>
 
-      <div className="flex justify-between text-[11px] text-stone-500 px-1 font-bold">
-        <span>Jangkauan: ~{reachDistance}m</span>
-        <span>Lepas buat nyentil! ✨</span>
-      </div>
+      {/* Clean high-contrast text percentage */}
+      <span
+        data-testid="hud-power-percentage"
+        className="font-mono text-sm font-black text-white text-stroke-black-heavy tracking-wider"
+      >
+        {displayPower}%
+      </span>
     </div>
   );
 };

@@ -44,8 +44,8 @@ export const CameraController: React.FC = () => {
         camera.position.y - ARENA_CONFIG.marbleRadius,
         camera.position.z - gz
       );
-    } else if (aimingState === 'AIMING') {
-      // AIMING: Camera remains completely static at player's chosen vantage point.
+    } else if (aimingState === 'AIMING' || aimingState === 'CHARGING') {
+      // AIMING / CHARGING: Camera remains completely static at player's chosen vantage point.
       // Zero auto-rotation, zero auto-centering, zero aim-following.
       cameraOffset.current.set(
         camera.position.x - gx,

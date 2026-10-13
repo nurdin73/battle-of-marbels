@@ -14,7 +14,7 @@ export const CardDeckOverlay: React.FC = () => {
   const toggleDeckExpanded = useCardStore((s) => s.toggleDeckExpanded);
 
   const aimingState = useGameStore((s) => s.aimingState);
-  const isInteracting = aimingState === 'AIMING' || aimingState === 'AIRBORNE' || aimingState === 'SIMULATING';
+  const isInteracting = aimingState === 'AIMING' || aimingState === 'CHARGING' || aimingState === 'AIRBORNE' || aimingState === 'SIMULATING';
 
   const getRarityBadge = (rarity: CardRarity) => {
     switch (rarity) {

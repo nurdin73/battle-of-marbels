@@ -41,7 +41,7 @@ export interface TrajectoryProjection {
   impactPoint?: Vector3D;
 }
 
-export type AimingState = 'IDLE' | 'AIMING' | 'LAUNCHED' | 'AIRBORNE' | 'SIMULATING' | 'EVALUATING';
+export type AimingState = 'IDLE' | 'AIMING' | 'CHARGING' | 'LAUNCHED' | 'AIRBORNE' | 'SIMULATING' | 'EVALUATING';
 
 export interface ActiveFlightData {
   origin: [number, number, number];

@@ -44,10 +44,18 @@ interface GameStoreState {
   resetRevision: number;
   evaluationEpoch: number;
   flightData: ActiveFlightData | null;
+  lockedDirection: { x: number; z: number } | null;
+  oscillatingPower: number;
+  launchTriggerCallback: ((powerPercentage: number) => void) | null;
 
   // Actions
   loadLevelConfig: (level: import('../types/level.types').LevelConfig) => void;
   setAimingState: (state: AimingState) => void;
+  setLockedDirection: (dir: { x: number; z: number } | null) => void;
+  setOscillatingPower: (power: number) => void;
+  setLaunchTriggerCallback: (cb: ((powerPercentage: number) => void) | null) => void;
+  fireFlick: (powerPercentage: number) => void;
+  cancelAiming: () => void;
   setGacoanMaterial: (material: MarbleMaterialType) => void;
   updateGacoanPos: (pos: [number, number, number]) => void;
   updateTargetLivePosition: (id: string, pos: [number, number, number]) => void;
@@ -131,11 +139,37 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   resetRevision: 0,
   evaluationEpoch: 0,
   flightData: null,
+  lockedDirection: null,
+  oscillatingPower: 0,
+  launchTriggerCallback: null,
 
   setAimingState: (aimingState) => {
-    // Timer only ticks during IDLE or AIMING
-    const isTimerActive = aimingState === 'IDLE' || aimingState === 'AIMING';
+    // Timer only ticks during IDLE, AIMING, or CHARGING
+    const isTimerActive = aimingState === 'IDLE' || aimingState === 'AIMING' || aimingState === 'CHARGING';
     set({ aimingState, isTimerActive });
+  },
+
+  setLockedDirection: (lockedDirection) => set({ lockedDirection }),
+
+  setOscillatingPower: (oscillatingPower) => set({ oscillatingPower }),
+
+  setLaunchTriggerCallback: (launchTriggerCallback) => set({ launchTriggerCallback }),
+
+  fireFlick: (powerPercentage) => {
+    const { launchTriggerCallback } = get();
+    if (launchTriggerCallback) {
+      launchTriggerCallback(powerPercentage);
+    }
+  },
+
+  cancelAiming: () => {
+    set({
+      aimingState: 'IDLE',
+      lockedDirection: null,
+      oscillatingPower: 0,
+      drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
+      isTimerActive: true,
+    });
   },
 
   setGacoanMaterial: (gacoanMaterial) => set({ gacoanMaterial }),
@@ -201,7 +235,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   tickTimer: () => {
     const { turnTimer, isTimerActive, aimingState, handleTurnTimeout } = get();
-    if (!isTimerActive || (aimingState !== 'IDLE' && aimingState !== 'AIMING')) return;
+    if (!isTimerActive || (aimingState !== 'IDLE' && aimingState !== 'AIMING' && aimingState !== 'CHARGING')) return;
 
     if (turnTimer <= 1) {
       handleTurnTimeout();
@@ -380,6 +414,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       resetRevision: state.resetRevision + 1,
       evaluationEpoch: 0,
       flightData: null,
+      lockedDirection: null,
+      oscillatingPower: 0,
     }));
   },
 
@@ -403,6 +439,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       resetRevision: state.resetRevision + 1,
       evaluationEpoch: 0,
       flightData: null,
+      lockedDirection: null,
+      oscillatingPower: 0,
     })),
 
   restartGame: () => {
@@ -430,6 +468,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       resetRevision: state.resetRevision + 1,
       evaluationEpoch: 0,
       flightData: null,
+      lockedDirection: null,
+      oscillatingPower: 0,
     }));
   },
 }));

@@ -38,12 +38,27 @@ export const TrajectoryLine: React.FC = () => {
       }));
   }, [targetMarbles, marblesOutsideRing, targetLivePositions]);
 
+  const lockedDirection = useGameStore((s) => s.lockedDirection);
+
   const isLob = activeCard?.id === 'CARD_LOB';
 
   const trajectory = useMemo(() => {
-    if (aimingState !== 'AIMING' || !showTrajectory || drag.distance < 0.03) {
+    const isAiming = aimingState === 'AIMING' && drag.distance >= 0.03;
+    const isCharging = aimingState === 'CHARGING' && lockedDirection !== null;
+
+    if ((!isAiming && !isCharging) || !showTrajectory) {
       return null;
     }
+
+    // Fixed steady trajectory direction and target point (does not oscillate with power)
+    const percentage = isCharging ? 100 : drag.percentage;
+    const dirVector = isCharging
+      ? {
+          x: lockedDirection.x * ARENA_CONFIG.maxDragDistance,
+          y: 0,
+          z: lockedDirection.z * ARENA_CONFIG.maxDragDistance,
+        }
+      : { x: drag.vector.x, y: 0, z: drag.vector.z };
 
     const options = {
       isLob,
@@ -53,13 +68,22 @@ export const TrajectoryLine: React.FC = () => {
 
     return calculateTrajectory(
       shooterOrigin,
-      { x: drag.vector.x, y: 0, z: drag.vector.z },
-      drag.percentage,
+      dirVector,
+      percentage,
       activeTargets,
       ARENA_CONFIG.marbleRadius,
       options
     );
-  }, [aimingState, showTrajectory, drag, shooterOrigin, activeTargets, activeCard, isLob]);
+  }, [
+    aimingState,
+    showTrajectory,
+    drag,
+    lockedDirection,
+    shooterOrigin,
+    activeTargets,
+    activeCard,
+    isLob,
+  ]);
 
   if (!trajectory || trajectory.points.length === 0) return null;
 

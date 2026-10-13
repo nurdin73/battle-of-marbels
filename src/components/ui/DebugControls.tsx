@@ -1,8 +1,12 @@
 import React from 'react';
 import { useGameStore } from '../../store/useGameStore';
-import { RotateCcw, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
+import { RotateCcw, Volume2, VolumeX, Eye, EyeOff, HelpCircle } from 'lucide-react';
 
-export const DebugControls: React.FC = () => {
+interface DebugControlsProps {
+  onOpenHelp?: () => void;
+}
+
+export const DebugControls: React.FC<DebugControlsProps> = ({ onOpenHelp }) => {
   const resetArena = useGameStore((s) => s.resetArena);
   const toggleMute = useGameStore((s) => s.toggleMute);
   const toggleTrajectory = useGameStore((s) => s.toggleTrajectory);
@@ -50,8 +54,20 @@ export const DebugControls: React.FC = () => {
         className="timbul-btn-coral flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer h-9"
       >
         <RotateCcw className="w-3.5 h-3.5 text-white" />
-        <span>Tata Ulang</span>
+        <span className="hidden sm:inline">Tata Ulang</span>
       </button>
+
+      {/* Help & Guide Modal Trigger (?) */}
+      {onOpenHelp && (
+        <button
+          data-testid="open-help-modal-btn"
+          onClick={onOpenHelp}
+          title="Panduan Bermain & Tombol Pintasan (?)"
+          className="w-9 h-9 rounded-2xl border-2 border-[#ffd3c9] border-b-[3px] border-b-[#f57b64] bg-[#fff7f4] hover:bg-[#ffede8] flex items-center justify-center text-[#d54425] active:translate-y-[1px] active:border-b-[2px] transition-all cursor-pointer shadow-sm"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 };

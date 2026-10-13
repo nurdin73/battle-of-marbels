@@ -9,7 +9,7 @@ export const TurnTimer: React.FC = () => {
   const tickTimer = useGameStore((s) => s.tickTimer);
 
   useEffect(() => {
-    if (!isTimerActive || isGameOver || (aimingState !== 'IDLE' && aimingState !== 'AIMING')) {
+    if (!isTimerActive || isGameOver || (aimingState !== 'IDLE' && aimingState !== 'AIMING' && aimingState !== 'CHARGING')) {
       return;
     }
 
