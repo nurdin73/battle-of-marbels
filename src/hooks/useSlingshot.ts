@@ -3,9 +3,10 @@ import * as THREE from 'three';
 import { ThreeEvent, useThree } from '@react-three/fiber';
 import { RapierRigidBody } from '@react-three/rapier';
 import { useGameStore } from '../store/useGameStore';
+import { useCardStore } from '../store/useCardStore';
 import { ARENA_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
-import { calculateParabolicTrajectory } from '../utils/trajectory.utils';
+import { calculateTrajectory } from '../utils/trajectory.utils';
 
 export function useSlingshot(
   rigidBodyRef: React.RefObject<RapierRigidBody>
@@ -88,6 +89,27 @@ export function useSlingshot(
           ARENA_CONFIG.minImpulse +
           powerScale * (ARENA_CONFIG.maxImpulse - ARENA_CONFIG.minImpulse);
 
+        // Check for active tactical card modifiers
+        const cardStore = useCardStore.getState();
+        const activeCardId = cardStore.activeCardId;
+        const activeCard = cardStore.handCards.find((c) => c.id === activeCardId);
+
+        let impulseMultiplier = 1.0;
+        let distanceMultiplier = 1.0;
+        let apexHeightMultiplier = 1.0;
+
+        if (activeCard) {
+          const mod = activeCard.modifier;
+          if (mod.impulseMultiplier) impulseMultiplier = mod.impulseMultiplier;
+          if (mod.trajectoryDistanceMultiplier) distanceMultiplier = mod.trajectoryDistanceMultiplier;
+          if (mod.apexHeightMultiplier) apexHeightMultiplier = mod.apexHeightMultiplier;
+          if (mod.swapMaterial) {
+            storeState.setGacoanMaterial(mod.swapMaterial);
+          }
+        }
+
+        const effectiveImpulse = impulseMagnitude * impulseMultiplier;
+
         const currentPos = storeState.gacoanCurrentPos;
         const shooterOrigin = {
           x: currentPos[0],
@@ -103,35 +125,66 @@ export function useSlingshot(
             radius: m.radius,
           }));
 
-        const trajectory = calculateParabolicTrajectory(
+        const isLob = activeCard?.id === 'CARD_LOB';
+
+        const trajectory = calculateTrajectory(
           shooterOrigin,
           { x: vector.x, y: 0, z: vector.z },
           percentage,
           activeTargets,
-          ARENA_CONFIG.marbleRadius
+          ARENA_CONFIG.marbleRadius,
+          {
+            isLob,
+            distanceMultiplier,
+            apexHeightMultiplier,
+          }
         );
 
         const distHypot = Math.hypot(vector.x, vector.z) || 1;
         const normX = vector.x / distHypot;
         const normZ = vector.z / distHypot;
 
-        // Set up active flight data for smooth, visible arching flight
-        const flightDuration = 0.55 + ratio * 0.40;
-        setFlightData({
-          origin: [shooterOrigin.x, shooterOrigin.y, shooterOrigin.z],
-          landingPoint: trajectory.landingPoint,
-          apexHeight: trajectory.apexHeight,
-          direction: { x: normX, z: normZ },
-          impulseMagnitude,
-          hitTargetId: trajectory.hitTargetId,
-          isHit: trajectory.isHit,
-          duration: flightDuration,
-        });
+        if (isLob) {
+          // LOB MODE: Parabolic arch through the air (CARD_LOB exclusive)
+          const flightDuration = 0.55 + ratio * 0.40;
+          setFlightData({
+            origin: [shooterOrigin.x, shooterOrigin.y, shooterOrigin.z],
+            landingPoint: trajectory.landingPoint,
+            apexHeight: trajectory.apexHeight,
+            direction: { x: normX, z: normZ },
+            impulseMagnitude: effectiveImpulse,
+            hitTargetId: trajectory.hitTargetId,
+            isHit: trajectory.isHit,
+            duration: flightDuration,
+          });
 
-        // Put rigid-body to sleep while airborne to prevent physics interference during flight
-        rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        rigidBodyRef.current.sleep();
+          rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.sleep();
+
+          setAimingState('AIRBORNE');
+        } else {
+          // AUTHENTIC GROUND ROLL: Native Rapier linear impulse directly on soil plane
+          setFlightData(null);
+          rigidBodyRef.current.wakeUp();
+          rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.applyImpulse(
+            {
+              x: normX * effectiveImpulse,
+              y: 0.0,
+              z: normZ * effectiveImpulse,
+            },
+            true
+          );
+
+          setAimingState('SIMULATING');
+        }
+
+        // Consume active card after successful flick release
+        if (activeCard) {
+          cardStore.consumeActiveCard();
+        }
 
         // Sound & state
         marbleAudio.playLaunchSound(ratio);

@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { ARENA_CONFIG } from '../../constants/physics.constants';
-import { calculateParabolicTrajectory } from '../../utils/trajectory.utils';
+import { calculateTrajectory } from '../../utils/trajectory.utils';
 import { Vector3D } from '../../types/physics.types';
+import { useCardStore } from '../../store/useCardStore';
 
 export const TrajectoryLine: React.FC = () => {
   const aimingState = useGameStore((s) => s.aimingState);
@@ -11,6 +12,10 @@ export const TrajectoryLine: React.FC = () => {
   const targetMarbles = useGameStore((s) => s.targetMarbles);
   const marblesOutsideRing = useGameStore((s) => s.marblesOutsideRing);
   const gacoanPos = useGameStore((s) => s.gacoanCurrentPos);
+
+  const activeCardId = useCardStore((s) => s.activeCardId);
+  const handCards = useCardStore((s) => s.handCards);
+  const activeCard = handCards.find((c) => c.id === activeCardId);
 
   const shooterOrigin: Vector3D = useMemo(
     () => ({
@@ -33,30 +38,39 @@ export const TrajectoryLine: React.FC = () => {
       }));
   }, [targetMarbles, marblesOutsideRing, targetLivePositions]);
 
+  const isLob = activeCard?.id === 'CARD_LOB';
+
   const trajectory = useMemo(() => {
     if (aimingState !== 'AIMING' || !showTrajectory || drag.distance < 0.03) {
       return null;
     }
 
-    return calculateParabolicTrajectory(
+    const options = {
+      isLob,
+      distanceMultiplier: activeCard?.modifier.trajectoryDistanceMultiplier,
+      apexHeightMultiplier: activeCard?.modifier.apexHeightMultiplier,
+    };
+
+    return calculateTrajectory(
       shooterOrigin,
       { x: drag.vector.x, y: 0, z: drag.vector.z },
       drag.percentage,
       activeTargets,
-      ARENA_CONFIG.marbleRadius
+      ARENA_CONFIG.marbleRadius,
+      options
     );
-  }, [aimingState, showTrajectory, drag, shooterOrigin, activeTargets]);
+  }, [aimingState, showTrajectory, drag, shooterOrigin, activeTargets, activeCard, isLob]);
 
   if (!trajectory || trajectory.points.length === 0) return null;
 
-  const dotColor = trajectory.isHit ? '#f43f5e' : '#38bdf8';
+  const dotColor = trajectory.isHit ? '#f43f5e' : isLob ? '#a855f7' : '#38bdf8';
   const ringColor = trajectory.isHit ? '#f43f5e' : '#38bdf8';
 
   return (
     <group>
-      {/* 3D Arching Parabolic Dots (Angry Birds Style) */}
+      {/* Primary Aim Path (Flat on ground for default, 3D Arc for Lob) */}
       {trajectory.points.map((pt, idx) => (
-        <mesh key={`arc-dot-${idx}`} position={pt.position}>
+        <mesh key={`aim-pt-${idx}`} position={pt.position}>
           <sphereGeometry args={[pt.scale, 12, 12]} />
           <meshBasicMaterial
             color={dotColor}
@@ -66,27 +80,63 @@ export const TrajectoryLine: React.FC = () => {
         </mesh>
       ))}
 
-      {/* Ground Landing / Impact Ring Marker */}
-      <group
-        position={[
-          trajectory.landingPoint[0],
-          0.005,
-          trajectory.landingPoint[2],
-        ]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        {/* Outer Ring */}
-        <mesh>
-          <ringGeometry args={[ARENA_CONFIG.marbleRadius * 0.9, ARENA_CONFIG.marbleRadius * 1.25, 32]} />
-          <meshBasicMaterial color={ringColor} transparent opacity={0.75} />
-        </mesh>
+      {/* Target Impact Marker Ring (Ground Mode Hit) */}
+      {trajectory.impactPoint && (
+        <group
+          position={[trajectory.impactPoint[0], 0.007, trajectory.impactPoint[2]]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <mesh>
+            <ringGeometry
+              args={[
+                ARENA_CONFIG.marbleRadius * 0.85,
+                ARENA_CONFIG.marbleRadius * 1.15,
+                24,
+              ]}
+            />
+            <meshBasicMaterial color="#f43f5e" transparent opacity={0.85} />
+          </mesh>
+        </group>
+      )}
 
-        {/* Inner Solid Target Dot */}
-        <mesh position={[0, 0, 0.001]}>
-          <circleGeometry args={[ARENA_CONFIG.marbleRadius * 0.35, 16]} />
-          <meshBasicMaterial color={ringColor} transparent opacity={0.85} />
+      {/* Secondary Target Kick Preview (Amber line showing kicked target direction) */}
+      {trajectory.targetKickPoints?.map((pt, idx) => (
+        <mesh key={`target-kick-${idx}`} position={pt.position}>
+          <sphereGeometry args={[pt.scale, 10, 10]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={pt.alpha} />
         </mesh>
-      </group>
+      ))}
+
+      {/* Secondary Shooter Deflection Preview (Sky blue line showing rebound angle) */}
+      {trajectory.shooterDeflectPoints?.map((pt, idx) => (
+        <mesh key={`deflect-pt-${idx}`} position={pt.position}>
+          <sphereGeometry args={[pt.scale, 10, 10]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={pt.alpha} />
+        </mesh>
+      ))}
+
+      {/* Lob Mode Ground Landing Circle Marker */}
+      {isLob && (
+        <group
+          position={[
+            trajectory.landingPoint[0],
+            0.007,
+            trajectory.landingPoint[2],
+          ]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <mesh>
+            <ringGeometry
+              args={[
+                ARENA_CONFIG.marbleRadius * 0.9,
+                ARENA_CONFIG.marbleRadius * 1.25,
+                32,
+              ]}
+            />
+            <meshBasicMaterial color={ringColor} transparent opacity={0.75} />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 };

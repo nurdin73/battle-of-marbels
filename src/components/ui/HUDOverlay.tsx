@@ -6,14 +6,20 @@ import { DebugControls } from './DebugControls';
 import { TurnTimer } from './TurnTimer';
 import { TurnFeedbackBanner } from './TurnFeedbackBanner';
 import { GameOverModal } from './GameOverModal';
+import { CardDeckOverlay } from './CardDeckOverlay';
 import { Trophy, Target, Flame } from 'lucide-react';
 import { GAMEPLAY_CONFIG } from '../../constants/physics.constants';
+import { useCardStore } from '../../store/useCardStore';
 
 export const HUDOverlay: React.FC = () => {
   const score = useGameStore((s) => s.score);
   const flickCount = useGameStore((s) => s.flickCount);
   const comboStreak = useGameStore((s) => s.comboStreak);
   const aimingState = useGameStore((s) => s.aimingState);
+
+  const activeCardId = useCardStore((s) => s.activeCardId);
+  const handCards = useCardStore((s) => s.handCards);
+  const activeCard = handCards.find((c) => c.id === activeCardId);
 
   return (
     <>
@@ -22,6 +28,9 @@ export const HUDOverlay: React.FC = () => {
 
       {/* Game Over Victory Modal */}
       <GameOverModal />
+
+      {/* Tactical Card Deck Overlay */}
+      <CardDeckOverlay />
 
       <div
         data-testid="hud-overlay"
@@ -38,7 +47,7 @@ export const HUDOverlay: React.FC = () => {
               <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-neutral-100 flex items-center gap-2">
                 KELERENG CLASH <span className="text-sky-400 font-mono text-xs px-1.5 py-0.5 rounded bg-sky-950/60 border border-sky-500/30">3D</span>
               </h1>
-              <p className="text-[10px] text-neutral-400 font-medium">Sprint 2 • Aturan Main & Timer 20s</p>
+              <p className="text-[10px] text-neutral-400 font-medium">Sprint 3 • Kartu Taktis & Energi Kapur</p>
             </div>
           </div>
 
@@ -102,8 +111,13 @@ export const HUDOverlay: React.FC = () => {
 
           {/* Interactive Instruction Hint */}
           <div className="bg-neutral-900/60 backdrop-blur-md border border-neutral-800 rounded-xl px-3 py-1.5 text-[11px] text-neutral-400 max-w-md text-center sm:text-right">
-            {aimingState === 'IDLE' && (
-              <span>💡 <strong>Tarik & lepas</strong> kelereng gacoan dalam 20 detik! Depak kelereng target keluar ring untuk mendapat kombo giliran tambahan.</span>
+            {activeCard && aimingState === 'IDLE' && (
+              <span className="text-amber-300 font-medium">
+                ✨ Kartu <strong>{activeCard.name}</strong> aktif! Tarik gacoan untuk melepaskan sentilan bertrik.
+              </span>
+            )}
+            {!activeCard && aimingState === 'IDLE' && (
+              <span>💡 Gunakan <strong>kartu taktis</strong> di bawah atau tarik gacoan langsung dalam 20 detik!</span>
             )}
             {aimingState === 'AIMING' && (
               <span className="text-sky-300 font-medium">🎯 Tentukan arah & daya sentil, lalu <strong>lepas</strong> untuk melambungkan kelereng!</span>

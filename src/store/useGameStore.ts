@@ -8,6 +8,7 @@ import {
 } from '../types/physics.types';
 import { ARENA_CONFIG, DEFAULT_SWIRL_COLORS, GAMEPLAY_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
+import { useCardStore } from './useCardStore';
 
 interface DragState {
   vector: { x: number; z: number };
@@ -219,6 +220,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   handleTurnTimeout: () => {
     marbleAudio.playFoulSound();
+    useCardStore.getState().regenerateChalk(1);
     set((state) => ({
       turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
       isTimerActive: true,
@@ -298,6 +300,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       };
     }
 
+    // Regenerate +1 chalk energy for new turn
+    useCardStore.getState().regenerateChalk(1);
+
     // Check Win Condition: All 9 target marbles pocketed
     const isGameOver = finalScore >= GAMEPLAY_CONFIG.initialTargetCount;
     let starsAwarded = 0;
@@ -365,7 +370,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       flightData: null,
     })),
 
-  restartGame: () =>
+  restartGame: () => {
+    useCardStore.getState().resetCardStore();
     set((state) => ({
       aimingState: 'IDLE',
       gacoanCurrentPos: INITIAL_GACOAN_POS,
@@ -389,5 +395,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       resetRevision: state.resetRevision + 1,
       evaluationEpoch: 0,
       flightData: null,
-    })),
+    }));
+  },
 }));

@@ -12,6 +12,7 @@ const INITIAL_SHOOTER_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetP
 export const ShooterMarble: React.FC = () => {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const stillFrameCountRef = useRef<number>(0);
+  const simulatingFrameCountRef = useRef<number>(0);
   const flightProgressRef = useRef<number>(0);
 
   const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
@@ -136,18 +137,22 @@ export const ShooterMarble: React.FC = () => {
 
     if (aimingState !== 'SIMULATING') {
       stillFrameCountRef.current = 0;
+      simulatingFrameCountRef.current = 0;
       return;
     }
 
+    simulatingFrameCountRef.current += 1;
     const linvel = rigidBodyRef.current.linvel();
     const speed = Math.hypot(linvel.x, linvel.y, linvel.z);
 
-    if (speed < ARENA_CONFIG.restVelocityThreshold) {
+    // Require at least 15 frames of motion before testing resting velocity
+    if (speed < ARENA_CONFIG.restVelocityThreshold && simulatingFrameCountRef.current > 15) {
       stillFrameCountRef.current += 1;
       // Require 20 consecutive resting frames (~0.33s) to confirm complete stop
       if (stillFrameCountRef.current > 20) {
         setAimingState('EVALUATING');
         stillFrameCountRef.current = 0;
+        simulatingFrameCountRef.current = 0;
 
         if (evaluationTimerRef.current) {
           clearTimeout(evaluationTimerRef.current);
