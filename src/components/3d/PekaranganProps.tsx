@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { CylinderCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
+import { Gltf, useGLTF } from '@react-three/drei';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
 interface BambooPole {
@@ -15,13 +16,29 @@ interface StoneData {
   position: [number, number, number];
   scale: [number, number, number];
   rotation: [number, number, number];
-  color: string;
+  modelSrc: string;
 }
 
 interface BrickData {
   position: [number, number, number];
   rotationY: number;
 }
+
+const ROCK_MODELS = [
+  '/assets/gltf/Rock_1_A_Color1.gltf',
+  '/assets/gltf/Rock_1_B_Color1.gltf',
+  '/assets/gltf/Rock_2_A_Color1.gltf',
+  '/assets/gltf/Rock_3_A_Color1.gltf',
+  '/assets/gltf/Rock_3_B_Color1.gltf',
+];
+
+const TREE_MODELS = [
+  '/assets/gltf/Tree_1_A_Color1.gltf',
+  '/assets/gltf/Tree_2_A_Color1.gltf',
+];
+
+ROCK_MODELS.forEach((src) => useGLTF.preload(src));
+TREE_MODELS.forEach((src) => useGLTF.preload(src));
 
 export const PekaranganProps: React.FC = () => {
   // Generate procedural bamboo fence poles along north, west, and east boundaries
@@ -60,7 +77,7 @@ export const PekaranganProps: React.FC = () => {
         height: 1.58 + (Math.sin(z * 6) * 0.2),
         radius: 0.043 + (Math.cos(z * 5) * 0.007),
         rotationY: Math.sin(z) * 0.2,
-        rotationZ: (Math.sin(z * 3) * 0.04),
+        rotationZ: (Math.cos(z * 3) * 0.04),
       });
     }
 
@@ -69,7 +86,6 @@ export const PekaranganProps: React.FC = () => {
 
   // Natural River Stones scattered in pekarangan around the chalk ring
   const stones = useMemo<StoneData[]>(() => {
-    const stoneColors = ['#475569', '#334155', '#64748b', '#52525b', '#3f3f46'];
     const data: StoneData[] = [];
 
     // Natural pebble clusters framing the outer ring
@@ -87,12 +103,12 @@ export const PekaranganProps: React.FC = () => {
     ];
 
     positions.forEach(([x, z], i) => {
-      const s = 0.10 + (i % 5) * 0.04;
+      const s = 0.50 + (i % 4) * 0.12;
       data.push({
-        position: [x, s * 0.4, z],
-        scale: [s * 1.3, s * 0.8, s * 1.1],
-        rotation: [Math.sin(i) * 0.3, i * 0.7, Math.cos(i) * 0.2],
-        color: stoneColors[i % stoneColors.length],
+        position: [x, 0, z],
+        scale: [s, s * 0.85, s],
+        rotation: [0, (i * 1.3) % (Math.PI * 2), 0],
+        modelSrc: ROCK_MODELS[i % ROCK_MODELS.length],
       });
     });
 
@@ -203,8 +219,8 @@ export const PekaranganProps: React.FC = () => {
         {stones.map((stone, idx) => (
           <CylinderCollider
             key={`stone-col-${idx}`}
-            args={[0.08, stone.scale[0] * 0.85]}
-            position={[stone.position[0], 0.08, stone.position[2]]}
+            args={[0.10, stone.scale[0] * 0.36]}
+            position={[stone.position[0], 0.10, stone.position[2]]}
           />
         ))}
         {bricks.map((brick, idx) => (
@@ -218,7 +234,7 @@ export const PekaranganProps: React.FC = () => {
       </RigidBody>
 
       {/* 1. Bamboo Fence (Pagar Bambu) Visuals */}
-      <group>
+      <group name="bamboo-fences">
         {bambooPoles.map((pole, idx) => (
           <mesh
             key={`pole-${idx}`}
@@ -267,124 +283,91 @@ export const PekaranganProps: React.FC = () => {
         </mesh>
       </group>
 
-      {/* 2. Tropical Village Shade Tree (Pohon Kersen Pekarangan) - North-West Framing */}
-      <group position={[-4.2, 0, -4.5]}>
-        {/* Main Tree Trunk */}
-        <mesh position={[0, 1.8, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.28, 0.42, 3.6, 8]} />
-          <meshStandardMaterial color="#451a03" roughness={0.9} />
-        </mesh>
+      {/* 2. GLTF Tropical Village Trees */}
+      <group name="village-trees">
+        {/* Main Shade Tree (North-West Framing) */}
+        <group position={[-4.2, 0, -4.5]}>
+          <Gltf
+            src="/assets/gltf/Tree_1_A_Color1.gltf"
+            scale={1.25}
+            castShadow
+            receiveShadow
+          />
+        </group>
 
-        {/* Angled Branch 1 */}
-        <mesh position={[0.4, 2.7, 0.3]} rotation={[0.4, 0.3, -0.5]} castShadow>
-          <cylinderGeometry args={[0.16, 0.22, 1.6, 6]} />
-          <meshStandardMaterial color="#451a03" roughness={0.9} />
-        </mesh>
-
-        {/* Angled Branch 2 */}
-        <mesh position={[-0.3, 2.9, -0.3]} rotation={[-0.3, 0.5, 0.6]} castShadow>
-          <cylinderGeometry args={[0.14, 0.2, 1.4, 6]} />
-          <meshStandardMaterial color="#451a03" roughness={0.9} />
-        </mesh>
-
-        {/* Lush Layered Foliage Canopy */}
-        <mesh position={[0.4, 3.6, 0.4]} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1.6, 1]} />
-          <meshStandardMaterial color="#15803d" roughness={0.85} flatShading />
-        </mesh>
-        <mesh position={[-0.6, 3.3, 0.7]} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1.3, 1]} />
-          <meshStandardMaterial color="#166534" roughness={0.85} flatShading />
-        </mesh>
-        <mesh position={[1.1, 3.4, -0.4]} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1.4, 1]} />
-          <meshStandardMaterial color="#14532d" roughness={0.85} flatShading />
-        </mesh>
-        <mesh position={[0.2, 4.5, 0.2]} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1.2, 1]} />
-          <meshStandardMaterial color="#22c55e" roughness={0.8} flatShading />
-        </mesh>
+        {/* Secondary Fruit Tree (North-East Framing) */}
+        <group position={[4.2, 0, -4.2]}>
+          <Gltf
+            src="/assets/gltf/Tree_2_A_Color1.gltf"
+            scale={1.15}
+            rotation={[0, 1.2, 0]}
+            castShadow
+            receiveShadow
+          />
+        </group>
       </group>
 
-      {/* 3. Secondary Smaller Fruit Tree / Sapling - North-East Framing */}
-      <group position={[4.2, 0, -4.2]}>
-        <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.2, 0.3, 3.0, 7]} />
-          <meshStandardMaterial color="#502808" roughness={0.9} />
-        </mesh>
-        <mesh position={[-0.3, 3.0, 0.2]} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1.4, 1]} />
-          <meshStandardMaterial color="#15803d" roughness={0.85} flatShading />
-        </mesh>
-        <mesh position={[0.5, 3.3, -0.2]} castShadow receiveShadow>
-          <dodecahedronGeometry args={[1.1, 1]} />
-          <meshStandardMaterial color="#16a34a" roughness={0.8} flatShading />
-        </mesh>
+      {/* 3. Traditional Terracotta Clay Pots (Pot Gerabah / Gentong) */}
+      <group name="terracotta-pots">
+        {/* Pot Group A: Left Side Ring Flank */}
+        <group position={[-2.7, 0, -2.4]}>
+          <mesh position={[0, 0.28, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.32, 0.2, 0.56, 12]} />
+            <meshStandardMaterial color="#c2410c" roughness={0.78} />
+          </mesh>
+          <mesh position={[0, 0.57, 0]} castShadow>
+            <torusGeometry args={[0.32, 0.04, 8, 16]} />
+            <meshStandardMaterial color="#9a3412" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.54, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.3, 12]} />
+            <meshStandardMaterial color="#271c19" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.72, 0]} castShadow>
+            <coneGeometry args={[0.26, 0.45, 5]} />
+            <meshStandardMaterial color="#15803d" roughness={0.7} flatShading />
+          </mesh>
+        </group>
+
+        {/* Pot Group B: Right Side Ring Flank */}
+        <group position={[2.7, 0, -2.2]}>
+          <mesh position={[0, 0.24, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.28, 0.18, 0.48, 12]} />
+            <meshStandardMaterial color="#ea580c" roughness={0.76} />
+          </mesh>
+          <mesh position={[0, 0.49, 0]} castShadow>
+            <torusGeometry args={[0.28, 0.035, 8, 16]} />
+            <meshStandardMaterial color="#c2410c" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.47, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.26, 12]} />
+            <meshStandardMaterial color="#271c19" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.65, 0]} castShadow>
+            <coneGeometry args={[0.24, 0.4, 6]} />
+            <meshStandardMaterial color="#22c55e" roughness={0.7} flatShading />
+          </mesh>
+        </group>
+
+        {/* Pot Group C: Left Outer Flank */}
+        <group position={[-3.3, 0, 0.8]}>
+          <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.25, 0.16, 0.44, 12]} />
+            <meshStandardMaterial color="#c2410c" roughness={0.78} />
+          </mesh>
+          <mesh position={[0, 0.45, 0]} castShadow>
+            <torusGeometry args={[0.25, 0.03, 8, 16]} />
+            <meshStandardMaterial color="#9a3412" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.62, 0]} castShadow>
+            <coneGeometry args={[0.22, 0.38, 5]} />
+            <meshStandardMaterial color="#16a34a" roughness={0.7} flatShading />
+          </mesh>
+        </group>
       </group>
 
-      {/* 4. Traditional Terracotta Clay Pots (Pot Gerabah / Gentong) */}
-      {/* Pot Group A: Left Side Ring Flank */}
-      <group position={[-2.7, 0, -2.4]}>
-        {/* Pot Base & Body */}
-        <mesh position={[0, 0.28, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.32, 0.2, 0.56, 12]} />
-          <meshStandardMaterial color="#c2410c" roughness={0.78} />
-        </mesh>
-        {/* Pot Rim */}
-        <mesh position={[0, 0.57, 0]} castShadow>
-          <torusGeometry args={[0.32, 0.04, 8, 16]} />
-          <meshStandardMaterial color="#9a3412" roughness={0.8} />
-        </mesh>
-        {/* Pot Soil */}
-        <mesh position={[0, 0.54, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.3, 12]} />
-          <meshStandardMaterial color="#271c19" roughness={0.95} />
-        </mesh>
-        {/* Tropical Caladium / Sansiviera Plant */}
-        <mesh position={[0, 0.72, 0]} castShadow>
-          <coneGeometry args={[0.26, 0.45, 5]} />
-          <meshStandardMaterial color="#15803d" roughness={0.7} flatShading />
-        </mesh>
-      </group>
-
-      {/* Pot Group B: Right Side Ring Flank */}
-      <group position={[2.7, 0, -2.2]}>
-        <mesh position={[0, 0.24, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.28, 0.18, 0.48, 12]} />
-          <meshStandardMaterial color="#ea580c" roughness={0.76} />
-        </mesh>
-        <mesh position={[0, 0.49, 0]} castShadow>
-          <torusGeometry args={[0.28, 0.035, 8, 16]} />
-          <meshStandardMaterial color="#c2410c" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.47, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.26, 12]} />
-          <meshStandardMaterial color="#271c19" roughness={0.95} />
-        </mesh>
-        <mesh position={[0, 0.65, 0]} castShadow>
-          <coneGeometry args={[0.24, 0.4, 6]} />
-          <meshStandardMaterial color="#22c55e" roughness={0.7} flatShading />
-        </mesh>
-      </group>
-
-      {/* Pot Group C: Left Outer Flank */}
-      <group position={[-3.3, 0, 0.8]}>
-        <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.25, 0.16, 0.44, 12]} />
-          <meshStandardMaterial color="#c2410c" roughness={0.78} />
-        </mesh>
-        <mesh position={[0, 0.45, 0]} castShadow>
-          <torusGeometry args={[0.25, 0.03, 8, 16]} />
-          <meshStandardMaterial color="#9a3412" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.62, 0]} castShadow>
-          <coneGeometry args={[0.22, 0.38, 5]} />
-          <meshStandardMaterial color="#16a34a" roughness={0.7} flatShading />
-        </mesh>
-      </group>
-
-      {/* 5. Indonesian Red Clay Bricks (Batu Bata Merah) */}
-      <group>
+      {/* 4. Indonesian Red Clay Bricks (Batu Bata Merah) */}
+      <group name="red-bricks">
         {bricks.map((brick, idx) => (
           <mesh
             key={`brick-${idx}`}
@@ -399,20 +382,18 @@ export const PekaranganProps: React.FC = () => {
         ))}
       </group>
 
-      {/* 6. River Pebbles & Yard Stones (Batu Kali) */}
-      <group>
+      {/* 5. Authentic GLTF River Pebbles & Yard Stones (Batu Kali) */}
+      <group name="yard-rocks">
         {stones.map((stone, idx) => (
-          <mesh
+          <Gltf
             key={`stone-${idx}`}
+            src={stone.modelSrc}
             position={stone.position}
             scale={stone.scale}
             rotation={stone.rotation}
             castShadow
             receiveShadow
-          >
-            <dodecahedronGeometry args={[1, 0]} />
-            <meshStandardMaterial color={stone.color} roughness={0.9} />
-          </mesh>
+          />
         ))}
       </group>
     </group>

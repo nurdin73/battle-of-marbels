@@ -1,45 +1,64 @@
 import React, { useMemo } from 'react';
+import { Gltf, useGLTF } from '@react-three/drei';
 
-interface GrassTuftData {
+interface FoliageData {
+  modelSrc: string;
   position: [number, number, number];
   scale: [number, number, number];
   rotationY: number;
-  color: string;
 }
 
-const GRASS_COLORS = [
-  '#15803d', // Dark tropical green
-  '#16a34a', // Natural foliage green
-  '#22c55e', // Vibrant grass green
-  '#65a30d', // Sunlit yellow-green
-  '#4d7c0f', // Olive green
+const GRASS_MODELS = [
+  '/assets/gltf/Grass_1_A_Color1.gltf',
+  '/assets/gltf/Grass_1_B_Color1.gltf',
+  '/assets/gltf/Grass_2_A_Color1.gltf',
 ];
 
-export const PekaranganGrass: React.FC = () => {
-  const tufts = useMemo<GrassTuftData[]>(() => {
-    const list: GrassTuftData[] = [];
+const BUSH_MODELS = [
+  '/assets/gltf/Bush_1_A_Color1.gltf',
+  '/assets/gltf/Bush_1_B_Color1.gltf',
+  '/assets/gltf/Bush_2_A_Color1.gltf',
+];
 
-    // Helper to generate a grass clump with organic jitter
-    const addCluster = (centerX: number, centerZ: number, count = 3, spread = 0.35) => {
+// Preload assets for instant rendering without hitching
+GRASS_MODELS.forEach((src) => useGLTF.preload(src));
+BUSH_MODELS.forEach((src) => useGLTF.preload(src));
+
+export const PekaranganGrass: React.FC = () => {
+  const foliageItems = useMemo<FoliageData[]>(() => {
+    const list: FoliageData[] = [];
+
+    // Helper to generate a grass & bush cluster with organic jitter
+    const addCluster = (centerX: number, centerZ: number, count = 3, spread = 0.35, isBush = false) => {
       for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2 + Math.sin(centerX + i) * 0.5;
-        const dist = 0.08 + (Math.abs(Math.cos(centerZ * 3 + i)) * spread);
+        const dist = 0.08 + Math.abs(Math.cos(centerZ * 3 + i)) * spread;
         const x = centerX + Math.cos(angle) * dist;
         const z = centerZ + Math.sin(angle) * dist;
 
-        // Ensure no grass sprouts inside the active swept marble ring (R <= 1.85m)
+        // Ensure zero foliage inside the active swept marble arena ring (R <= 1.85m)
         const radiusFromCenter = Math.hypot(x, z);
         if (radiusFromCenter <= 1.85) continue;
 
-        const heightScale = 0.16 + (Math.abs(Math.sin(x * 7 + z * 5)) * 0.14);
-        const widthScale = 0.18 + (Math.abs(Math.cos(x * 4 + z * 8)) * 0.12);
-
-        list.push({
-          position: [x, 0, z],
-          scale: [widthScale, heightScale, widthScale],
-          rotationY: (x * 3.7 + z * 2.1) % (Math.PI * 2),
-          color: GRASS_COLORS[(list.length) % GRASS_COLORS.length],
-        });
+        if (isBush && i === 0) {
+          // Add a low-poly bush
+          const bScale = 0.65 + Math.abs(Math.sin(x * 5 + z * 3)) * 0.35;
+          list.push({
+            modelSrc: BUSH_MODELS[list.length % BUSH_MODELS.length],
+            position: [x, 0, z],
+            scale: [bScale, bScale, bScale],
+            rotationY: (x * 4.3 + z * 2.7) % (Math.PI * 2),
+          });
+        } else {
+          // Add grass tuft
+          const gScale = 0.75 + Math.abs(Math.cos(x * 4 + z * 7)) * 0.45;
+          list.push({
+            modelSrc: GRASS_MODELS[list.length % GRASS_MODELS.length],
+            position: [x, 0, z],
+            scale: [gScale, gScale * 0.9, gScale],
+            rotationY: (x * 3.7 + z * 2.1) % (Math.PI * 2),
+          });
+        }
       }
     };
 
@@ -52,71 +71,57 @@ export const PekaranganGrass: React.FC = () => {
       [2.6, 0.3], [2.9, 1.1], [2.5, 2.1],
       [-1.6, 3.1], [1.5, 3.2], [0.2, 3.6],
     ];
-    stoneAnchors.forEach(([x, z]) => addCluster(x, z, 3, 0.28));
+    stoneAnchors.forEach(([x, z], idx) => {
+      addCluster(x, z, 3, 0.32, idx % 4 === 0);
+    });
 
-    // 2. Grass clusters around Banana Tree Clumps
-    addCluster(-3.8, -3.8, 6, 0.65);
-    addCluster(-3.4, -3.5, 4, 0.5);
-    addCluster(3.9, -1.2, 6, 0.6);
-    addCluster(3.6, -4.2, 5, 0.55);
+    // 2. Bushes & Grass around Banana Tree Clumps
+    addCluster(-3.8, -3.8, 5, 0.7, true);
+    addCluster(-3.3, -3.4, 4, 0.5, false);
+    addCluster(3.9, -1.2, 5, 0.65, true);
+    addCluster(3.6, -4.2, 5, 0.6, true);
 
-    // 3. Grass clusters around Kersen Shade Tree
-    addCluster(-4.2, -4.5, 8, 0.85);
-    addCluster(-4.0, -4.0, 5, 0.6);
-    addCluster(4.2, -4.2, 6, 0.7);
+    // 3. Grass & Bushes around Main Trees
+    addCluster(-4.2, -4.5, 6, 0.85, true);
+    addCluster(-4.0, -4.0, 4, 0.6, false);
+    addCluster(4.2, -4.2, 5, 0.7, true);
 
-    // 4. Grass clusters around Terracotta Pots and Bricks
-    addCluster(-2.7, -2.4, 4, 0.4);
-    addCluster(2.7, -2.2, 4, 0.4);
-    addCluster(-3.3, 0.8, 3, 0.35);
-    addCluster(-2.6, -2.9, 4, 0.45);
-    addCluster(2.6, -2.9, 4, 0.45);
+    // 4. Foliage near Terracotta Pots and Bricks
+    addCluster(-2.7, -2.4, 3, 0.4, false);
+    addCluster(2.7, -2.2, 3, 0.4, false);
+    addCluster(-3.3, 0.8, 3, 0.35, true);
+    addCluster(-2.6, -2.9, 3, 0.45, false);
+    addCluster(2.6, -2.9, 3, 0.45, false);
 
-    // 5. Grass fringe along Bamboo Fence bases (North, West, East)
-    for (let x = -5.2; x <= 5.2; x += 0.85) {
-      addCluster(x, -5.5 + Math.sin(x * 3) * 0.15, 2, 0.2);
+    // 5. Grass & Bushes along Bamboo Fence perimeter (North, West, East)
+    for (let x = -5.0; x <= 5.0; x += 1.2) {
+      addCluster(x, -5.5 + Math.sin(x * 3) * 0.15, 2, 0.25, Math.abs(x) > 2);
     }
-    for (let z = -5.0; z <= 5.0; z += 0.9) {
-      addCluster(-5.5 + Math.cos(z * 3) * 0.15, z, 2, 0.2);
-      addCluster(5.5 + Math.sin(z * 4) * 0.15, z, 2, 0.2);
+    for (let z = -4.8; z <= 4.8; z += 1.3) {
+      addCluster(-5.5 + Math.cos(z * 3) * 0.15, z, 2, 0.25, Math.abs(z) > 1.5);
+      addCluster(5.5 + Math.sin(z * 4) * 0.15, z, 2, 0.25, Math.abs(z) > 1.5);
     }
 
-    // 6. Yard outskirts & behind player line
-    for (let x = -4.5; x <= 4.5; x += 1.4) {
-      addCluster(x, 4.2 + Math.sin(x * 5) * 0.3, 3, 0.4);
-      addCluster(x, 5.2 + Math.cos(x * 4) * 0.2, 3, 0.35);
+    // 6. Yard outskirts & behind player starting line
+    for (let x = -4.2; x <= 4.2; x += 1.8) {
+      addCluster(x, 4.4 + Math.sin(x * 5) * 0.25, 2, 0.35, false);
     }
 
     return list;
   }, []);
 
   return (
-    <group name="pekarangan-grass">
-      {tufts.map((tuft, idx) => (
-        <group
-          key={`grass-${idx}`}
-          position={tuft.position}
-          scale={tuft.scale}
-          rotation={[0, tuft.rotationY, 0]}
-        >
-          {/* Blade Pair 1: Front-Back crossed blade fan */}
-          <mesh position={[0, 0.48, 0]} castShadow>
-            <coneGeometry args={[0.32, 1.0, 4]} />
-            <meshStandardMaterial color={tuft.color} roughness={0.85} flatShading />
-          </mesh>
-
-          {/* Blade Pair 2: Angled perpendicular blade fan */}
-          <mesh position={[0, 0.42, 0]} rotation={[0.15, Math.PI / 3, -0.1]}>
-            <coneGeometry args={[0.26, 0.88, 4]} />
-            <meshStandardMaterial color={tuft.color} roughness={0.85} flatShading />
-          </mesh>
-
-          {/* Blade Pair 3: Lower spreading leaf */}
-          <mesh position={[0.04, 0.3, -0.03]} rotation={[-0.2, -Math.PI / 4, 0.25]}>
-            <coneGeometry args={[0.22, 0.65, 3]} />
-            <meshStandardMaterial color="#65a30d" roughness={0.9} flatShading />
-          </mesh>
-        </group>
+    <group name="pekarangan-foliage">
+      {foliageItems.map((item, idx) => (
+        <Gltf
+          key={`foliage-${idx}`}
+          src={item.modelSrc}
+          position={item.position}
+          scale={item.scale}
+          rotation={[0, item.rotationY, 0]}
+          castShadow
+          receiveShadow
+        />
       ))}
     </group>
   );
