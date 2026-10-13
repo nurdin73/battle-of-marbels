@@ -130,9 +130,21 @@ export const PekaranganProps: React.FC = () => {
     marbleAudio.playWoodKnockSound(1.2);
   };
 
+  const handleTreeCollision = () => {
+    marbleAudio.playTreeThudSound(1.2);
+  };
+
+  const handlePotCollision = () => {
+    marbleAudio.playCeramicClinkSound(1.2);
+  };
+
+  const handleStoneCollision = () => {
+    marbleAudio.playStoneClackSound(1.2);
+  };
+
   return (
     <group name="pekarangan-props">
-      {/* Physical Collider Layer for Pekarangan Props */}
+      {/* 1. Bamboo Fence Physical Layer (Elastic, Hollow Wood Knock) */}
       <RigidBody
         type="fixed"
         colliders={false}
@@ -140,7 +152,6 @@ export const PekaranganProps: React.FC = () => {
         restitution={0.65}
         onCollisionEnter={handleFenceCollision}
       >
-        {/* 1. Bamboo Pole Physical Colliders */}
         {bambooPoles.map((pole, idx) => (
           <CylinderCollider
             key={`pole-col-${idx}`}
@@ -154,15 +165,56 @@ export const PekaranganProps: React.FC = () => {
         <CuboidCollider args={[5.8, 0.5, 0.05]} position={[0, 0.5, -5.8]} />
         <CuboidCollider args={[0.05, 0.5, 5.8]} position={[-5.8, 0.5, 0]} />
         <CuboidCollider args={[0.05, 0.5, 5.8]} position={[5.8, 0.5, 0]} />
+      </RigidBody>
 
-        {/* 2. Tree Trunk Colliders */}
+      {/* 2. Tree Trunks Physical Layer (Damped / Low Restitution Bark Absorption, Deep Thud) */}
+      <RigidBody
+        type="fixed"
+        colliders={false}
+        friction={0.45}
+        restitution={0.42}
+        onCollisionEnter={handleTreeCollision}
+      >
         <CylinderCollider args={[1.8, 0.38]} position={[-4.2, 1.8, -4.5]} />
         <CylinderCollider args={[1.5, 0.28]} position={[4.2, 1.5, -4.2]} />
+      </RigidBody>
 
-        {/* 3. Terracotta Pot Colliders */}
+      {/* 3. Terracotta Pots Physical Layer (Hollow Earthenware Resonance, Moderate Bounce) */}
+      <RigidBody
+        type="fixed"
+        colliders={false}
+        friction={0.32}
+        restitution={0.58}
+        onCollisionEnter={handlePotCollision}
+      >
         <CylinderCollider args={[0.28, 0.32]} position={[-2.7, 0.28, -2.4]} />
         <CylinderCollider args={[0.24, 0.28]} position={[2.7, 0.24, -2.2]} />
         <CylinderCollider args={[0.22, 0.25]} position={[-3.3, 0.22, 0.8]} />
+      </RigidBody>
+
+      {/* 4. River Stones & Red Bricks Physical Layer (Hard Mineral, High Restitution Elastic Ping) */}
+      <RigidBody
+        type="fixed"
+        colliders={false}
+        friction={0.22}
+        restitution={0.78}
+        onCollisionEnter={handleStoneCollision}
+      >
+        {stones.map((stone, idx) => (
+          <CylinderCollider
+            key={`stone-col-${idx}`}
+            args={[0.08, stone.scale[0] * 0.85]}
+            position={[stone.position[0], 0.08, stone.position[2]]}
+          />
+        ))}
+        {bricks.map((brick, idx) => (
+          <CuboidCollider
+            key={`brick-col-${idx}`}
+            args={[0.12, 0.045, 0.06]}
+            position={brick.position}
+            rotation={[0, brick.rotationY, 0]}
+          />
+        ))}
       </RigidBody>
 
       {/* 1. Bamboo Fence (Pagar Bambu) Visuals */}

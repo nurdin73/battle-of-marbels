@@ -283,6 +283,113 @@ class MarbleAudioSynthesizer {
   }
 
   /**
+   * Synthesize sharp stone / river pebble collision crack
+   */
+  public playStoneClackSound(relativeVelocity: number = 1.0): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const velocityClamped = Math.min(Math.max(relativeVelocity, 0.1), 4.0);
+    const volumeFactor = Math.min(1.0, velocityClamped / 2.0);
+    const now = ctx.currentTime;
+
+    // High mineral transient
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'triangle';
+    const baseFreq = 2800 + Math.random() * 400;
+    osc1.frequency.setValueAtTime(baseFreq, now);
+    osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + 0.035);
+
+    gain1.gain.setValueAtTime(Math.max(0.04, 0.38 * volumeFactor), now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.05);
+
+    // High harmonic ping
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(5100 + Math.random() * 500, now);
+    gain2.gain.setValueAtTime(Math.max(0.02, 0.18 * volumeFactor), now);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now);
+    osc2.stop(now + 0.04);
+  }
+
+  /**
+   * Synthesize hollow earthenware terracotta pot / bucket resonant clink
+   */
+  public playCeramicClinkSound(relativeVelocity: number = 1.0): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const velocityClamped = Math.min(Math.max(relativeVelocity, 0.1), 4.0);
+    const volumeFactor = Math.min(1.0, velocityClamped / 2.0);
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'triangle';
+    const baseFreq = 1180 + Math.random() * 120;
+    osc1.frequency.setValueAtTime(baseFreq, now);
+    osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.75, now + 0.07);
+
+    gain1.gain.setValueAtTime(Math.max(0.03, 0.35 * volumeFactor), now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.09);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(baseFreq * 1.55, now);
+    gain2.gain.setValueAtTime(Math.max(0.015, 0.16 * volumeFactor), now);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now);
+    osc2.stop(now + 0.1);
+  }
+
+  /**
+   * Synthesize deep dull tree trunk bark thud
+   */
+  public playTreeThudSound(relativeVelocity: number = 1.0): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const velocityClamped = Math.min(Math.max(relativeVelocity, 0.1), 4.0);
+    const volumeFactor = Math.min(1.0, velocityClamped / 2.0);
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    const baseFreq = 210 + Math.random() * 40;
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+
+    gain.gain.setValueAtTime(Math.max(0.05, 0.45 * volumeFactor), now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
+  /**
    * Synthesize tactile launch whoosh / release flick
    */
   public playLaunchSound(forceNormalized: number): void {
