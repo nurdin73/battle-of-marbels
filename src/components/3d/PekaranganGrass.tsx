@@ -11,7 +11,7 @@ interface FoliageData {
 const GRASS_MODELS = [
   '/assets/playground/Grass/Flat_Grass_small.glb',
   '/assets/playground/Grass/Flat_Grass_medium.glb',
-  '/assets/playground/Grass/Flat_Grass_large.glb',
+  '/assets/playground/Extras/Flat_Flowers_red.glb',
 ];
 
 const BUSH_MODELS = [

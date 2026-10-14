@@ -288,7 +288,7 @@ export const PekaranganProps: React.FC = () => {
         {/* Main Shade Tree (North-West Framing) */}
         <group position={[-4.2, 0, -4.5]}>
           <Gltf
-            src="/assets/playground/Trees/oak/Flat_Tree_Oak_large_green.glb"
+            src="/assets/playground/Trees/oak/Flat_Tree_Oak_small_green.glb"
             scale={0.55}
             castShadow
             receiveShadow
