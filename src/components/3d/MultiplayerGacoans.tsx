@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
-import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS } from '../../constants/physics.constants';
-import { useMultiplayerStore } from '../../store/useMultiplayerStore';
+import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS, SCENE_PERIMETER_BOUNDS } from '../../constants/physics.constants';
+import { useMultiplayerStore, INITIAL_P1_POS, INITIAL_P2_POS } from '../../store/useMultiplayerStore';
 import { useGameStore } from '../../store/useGameStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
@@ -17,6 +17,7 @@ export const MultiplayerGacoans: React.FC = () => {
   const remotePlayer = useMultiplayerStore((s) => s.remotePlayer);
   const matchPhase = useMultiplayerStore((s) => s.matchPhase);
   const currentTurnPlayerId = useMultiplayerStore((s) => s.currentTurnPlayerId);
+  const cameraFocusMode = useMultiplayerStore((s) => s.cameraFocusMode);
   const broadcastRestState = useMultiplayerStore((s) => s.broadcastRestState);
 
   const aimingState = useGameStore((s) => s.aimingState);
@@ -29,10 +30,13 @@ export const MultiplayerGacoans: React.FC = () => {
 
   const tossShotDoneP1 = useMultiplayerStore((s) => s.tossShotDoneP1);
   const tossShotDoneP2 = useMultiplayerStore((s) => s.tossShotDoneP2);
+  const tossBannerMessage = useMultiplayerStore((s) => s.tossBannerMessage);
 
-  // Still frame counters for resting detection
+  // Still frame counters and timers for resting and out-of-bounds detection
   const simulatingFramesRef = useRef<number>(0);
   const stillFramesRef = useRef<number>(0);
+  const outOfBoundsTimerRef = useRef<number>(0);
+  const simulatingDurationRef = useRef<number>(0);
 
   // Active rigid body for slingshot: attaches to P1 if Host, P2 if Guest
   const activeLocalRigidBody = isHost ? p1RigidBodyRef : p2RigidBodyRef;
@@ -74,7 +78,6 @@ export const MultiplayerGacoans: React.FC = () => {
       targetBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
       targetBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
       targetBody.applyImpulse(payload.impulse, true);
-      setAimingState('SIMULATING');
     });
 
     // Remote rest state reconciliation (Guest reconciles positions from Host)
@@ -103,27 +106,86 @@ export const MultiplayerGacoans: React.FC = () => {
   }, [isHost, setAimingState]);
 
   const tossResolutionScheduledRef = useRef<boolean>(false);
+  const tossStillFramesRef = useRef<number>(0);
+  const tossSimulatingFramesRef = useRef<number>(0);
 
   useEffect(() => {
     if (matchPhase === 'TOSS_PHASE') {
       tossResolutionScheduledRef.current = false;
+      tossStillFramesRef.current = 0;
+      tossSimulatingFramesRef.current = 0;
+      // Reposition both gacoans physically back to original starting coordinates
+      if (p1RigidBodyRef.current) {
+        p1RigidBodyRef.current.setTranslation({ x: INITIAL_P1_POS[0], y: INITIAL_P1_POS[1], z: INITIAL_P1_POS[2] }, true);
+        p1RigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        p1RigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      if (p2RigidBodyRef.current) {
+        p2RigidBodyRef.current.setTranslation({ x: INITIAL_P2_POS[0], y: INITIAL_P2_POS[1], z: INITIAL_P2_POS[2] }, true);
+        p2RigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        p2RigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      useGameStore.getState().updateGacoanPos(isHost ? INITIAL_P1_POS : INITIAL_P2_POS);
     }
-  }, [matchPhase]);
+  }, [matchPhase, isHost]);
 
   // Frame monitoring for ball resting & turn transition
-  useFrame(() => {
-    // 1. Synchronize local player's gacoan coordinates to game store every frame so CameraController tracks it smoothly
+  useFrame((_, delta) => {
+    // 1. Real-time gacoan coordinate synchronization to game store for CameraController tracking
     const localRigidBody = isHost ? p1RigidBodyRef.current : p2RigidBodyRef.current;
-    if (localRigidBody) {
-      const trans = localRigidBody.translation();
+    const opponentRigidBody = isHost ? p2RigidBodyRef.current : p1RigidBodyRef.current;
+
+    // Determine which gacoan the camera should track:
+    // - If cameraFocusMode is 'OPPONENT' or ('AUTO' during opponent's turn), track opponent in real time
+    // - Otherwise track local gacoan
+    const shouldTrackOpponent =
+      cameraFocusMode === 'OPPONENT' || (cameraFocusMode === 'AUTO' && !isMyTurn && matchPhase === 'PLAYING');
+    const trackedRigidBody = shouldTrackOpponent ? opponentRigidBody : localRigidBody;
+
+    if (trackedRigidBody) {
+      const trans = trackedRigidBody.translation();
       useGameStore.getState().updateGacoanPos([trans.x, trans.y, trans.z]);
     }
 
-    // 2. Direct Toss Phase resolution: no waiting for dead-stop rest velocity
+    // 2. Direct Toss Phase resolution: strictly wait for BOTH gacoan balls to completely settle before announcing winner
     if (matchPhase === 'TOSS_PHASE') {
       if (isHost && tossShotDoneP1 && tossShotDoneP2 && !tossResolutionScheduledRef.current) {
-        tossResolutionScheduledRef.current = true;
-        setTimeout(() => {
+        tossSimulatingFramesRef.current += 1;
+
+        const vel1 = p1RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
+        const vel2 = p2RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
+        const speed1 = Math.hypot(vel1.x, vel1.y, vel1.z);
+        const speed2 = Math.hypot(vel2.x, vel2.y, vel2.z);
+        const maxSpeed = Math.max(speed1, speed2);
+
+        // Keep dynamic banner updated while waiting for physics to settle
+        if (tossBannerMessage !== '⏳ Menunggu kedua gacoan berhenti bergulir...') {
+          useMultiplayerStore.setState({
+            tossBannerMessage: '⏳ Menunggu kedua gacoan berhenti bergulir...',
+          });
+        }
+
+        // Both gacoans must have slowed down below rest threshold
+        // Require > 15 simulating frames first to allow impulses to register
+        if (maxSpeed < ARENA_CONFIG.restVelocityThreshold && tossSimulatingFramesRef.current > 15) {
+          tossStillFramesRef.current += 1;
+        } else {
+          tossStillFramesRef.current = 0;
+        }
+
+        // Safety watchdog: max ~9 seconds (540 frames) in case of micro-jitter
+        const isWatchdogTriggered = tossSimulatingFramesRef.current > 540;
+
+        // Only declare toss winner once BOTH gacoans have been completely still for 25 consecutive frames (~0.4s)
+        if (tossStillFramesRef.current >= 25 || isWatchdogTriggered) {
+          tossResolutionScheduledRef.current = true;
+
+          // Halt velocities completely
+          p1RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          p1RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          p2RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          p2RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
           const t1 = p1RigidBodyRef.current?.translation();
           const t2 = p2RigidBodyRef.current?.translation();
           const p1Pos: [number, number, number] = t1 ? [t1.x, t1.y, t1.z] : [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
@@ -134,9 +196,9 @@ export const MultiplayerGacoans: React.FC = () => {
           const d2 = Math.abs(Math.hypot(p2Pos[0], p2Pos[2]) - ARENA_CONFIG.ringRadius);
           const firstTurnId = d1 <= d2 ? localPlayer.id : remotePlayer?.id || localPlayer.id;
 
-          // Broadcast toss result
+          // Broadcast toss result — KEEP matchPhase in TOSS_PHASE so target marbles don't spawn prematurely!
           useMultiplayerStore.setState({
-            matchPhase: 'PLAYING',
+            matchPhase: 'TOSS_PHASE',
             currentTurnPlayerId: firstTurnId,
             gacoanP1Pos: p1Pos,
             gacoanP2Pos: p2Pos,
@@ -153,10 +215,20 @@ export const MultiplayerGacoans: React.FC = () => {
 
           setAimingState('IDLE');
 
+          // Once celebratory banner completes (3.5s), officially start PLAYING and spawn target marbles!
           setTimeout(() => {
-            useMultiplayerStore.setState({ tossBannerMessage: null });
+            useMultiplayerStore.setState({
+              matchPhase: 'PLAYING',
+              tossBannerMessage: null,
+            });
+            import('../../services/peerService').then(({ peerService }) => {
+              peerService.sendMessage({
+                type: 'MATCH_PLAYING_START',
+              });
+            });
+            setAimingState('IDLE');
           }, 3500);
-        }, 1200);
+        }
       }
       return;
     }
@@ -165,12 +237,143 @@ export const MultiplayerGacoans: React.FC = () => {
     if (aimingState !== 'SIMULATING') {
       simulatingFramesRef.current = 0;
       stillFramesRef.current = 0;
+      outOfBoundsTimerRef.current = 0;
+      simulatingDurationRef.current = 0;
       return;
     }
 
     simulatingFramesRef.current += 1;
+    simulatingDurationRef.current += delta;
 
-    // Check speeds of both gacoan balls
+    const t1 = p1RigidBodyRef.current?.translation();
+    const t2 = p2RigidBodyRef.current?.translation();
+
+    // Out-of-Bounds Detection for both gacoans
+    const isP1OOB = Boolean(
+      t1 &&
+        (Math.abs(t1.x) > SCENE_PERIMETER_BOUNDS.maxX ||
+          Math.abs(t1.z) > SCENE_PERIMETER_BOUNDS.maxZ ||
+          t1.y < SCENE_PERIMETER_BOUNDS.minY)
+    );
+    const isP2OOB = Boolean(
+      t2 &&
+        (Math.abs(t2.x) > SCENE_PERIMETER_BOUNDS.maxX ||
+          Math.abs(t2.z) > SCENE_PERIMETER_BOUNDS.maxZ ||
+          t2.y < SCENE_PERIMETER_BOUNDS.minY)
+    );
+    const isAnyOOB = isP1OOB || isP2OOB;
+
+    // Helper to resolve match turn outcome and synchronize
+    const resolveMatchOutcome = (forceResetP1OOB = false, forceResetP2OOB = false) => {
+      setAimingState('EVALUATING');
+      stillFramesRef.current = 0;
+      simulatingFramesRef.current = 0;
+      outOfBoundsTimerRef.current = 0;
+      simulatingDurationRef.current = 0;
+
+      // Halt physics velocities immediately
+      p1RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      p1RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      p2RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      p2RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+      // Reposition out-of-bounds gacoans to default legal starting positions
+      if (forceResetP1OOB && p1RigidBodyRef.current) {
+        p1RigidBodyRef.current.setTranslation({ x: INITIAL_P1_POS[0], y: INITIAL_P1_POS[1], z: INITIAL_P1_POS[2] }, true);
+        p1RigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        p1RigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      if (forceResetP2OOB && p2RigidBodyRef.current) {
+        p2RigidBodyRef.current.setTranslation({ x: INITIAL_P2_POS[0], y: INITIAL_P2_POS[1], z: INITIAL_P2_POS[2] }, true);
+        p2RigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        p2RigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+
+      const delayMs = forceResetP1OOB || forceResetP2OOB ? 150 : 400;
+
+      setTimeout(() => {
+        triggerEvaluation();
+
+        setTimeout(() => {
+          const curT1 = p1RigidBodyRef.current?.translation();
+          const curT2 = p2RigidBodyRef.current?.translation();
+          const p1Pos: [number, number, number] = curT1 ? [curT1.x, curT1.y, curT1.z] : INITIAL_P1_POS;
+          const p2Pos: [number, number, number] = curT2 ? [curT2.x, curT2.y, curT2.z] : INITIAL_P2_POS;
+
+          const activePos = currentTurnPlayerId === localPlayer.id ? (isHost ? p1Pos : p2Pos) : (isHost ? p2Pos : p1Pos);
+
+          // Read pocketed targets count BEFORE evaluateTurnOutcome resets targetsPocketedThisTurn!
+          const targetsPocketed = useGameStore.getState().targetsPocketedThisTurnIds.length;
+          evaluateTurnOutcome(activePos);
+
+          // Host broadcasts authoritative rest-state
+          if (isHost) {
+            const mpStore = useMultiplayerStore.getState();
+            const gameState = useGameStore.getState();
+            const isCombo = gameState.lastTurnOutcome?.resultType === 'COMBO_EXTRA_TURN';
+            const isHostTurn = mpStore.currentTurnPlayerId === mpStore.localPlayer.id;
+
+            const nextScores = {
+              host: isHostTurn ? mpStore.scores.host + targetsPocketed : mpStore.scores.host,
+              guest: !isHostTurn ? mpStore.scores.guest + targetsPocketed : mpStore.scores.guest,
+            };
+
+            const isMatchOver =
+              (nextScores.host + nextScores.guest) >= mpStore.targetCount ||
+              gameState.marblesOutsideRing.length >= mpStore.targetCount;
+
+            const nextTurnId = isCombo
+              ? mpStore.currentTurnPlayerId!
+              : isHostTurn
+              ? (mpStore.remotePlayer?.id || mpStore.localPlayer.id)
+              : mpStore.localPlayer.id;
+
+            broadcastRestState({
+              turnIndex: gameState.turnCount,
+              gacoanP1Position: p1Pos,
+              gacoanP2Position: p2Pos,
+              targetPositions: gameState.targetLivePositions,
+              marblesOutsideRing: gameState.marblesOutsideRing,
+              scores: nextScores,
+              nextTurnPlayerId: nextTurnId,
+              isMatchOver,
+            });
+
+            if (isMatchOver) {
+              useMultiplayerStore.setState({ isMatchOver: true });
+            }
+          }
+
+          setAimingState('IDLE');
+        }, 200);
+      }, delayMs);
+    };
+
+    // If any gacoan is out of bounds, dampen velocity and trigger 2-second reset timer
+    if (isAnyOOB) {
+      if (isP1OOB && p1RigidBodyRef.current) {
+        p1RigidBodyRef.current.setLinvel({ x: 0, y: Math.max(-0.4, p1RigidBodyRef.current.linvel().y), z: 0 }, true);
+      }
+      if (isP2OOB && p2RigidBodyRef.current) {
+        p2RigidBodyRef.current.setLinvel({ x: 0, y: Math.max(-0.4, p2RigidBodyRef.current.linvel().y), z: 0 }, true);
+      }
+      outOfBoundsTimerRef.current += delta;
+
+      if (outOfBoundsTimerRef.current >= SCENE_PERIMETER_BOUNDS.outOfBoundsResetDelaySeconds) {
+        resolveMatchOutcome(isP1OOB, isP2OOB);
+        return;
+      }
+    } else {
+      outOfBoundsTimerRef.current = 0;
+    }
+
+    // Safety watchdog: if marbles keep rolling/jittering for > 7s, force settlement
+    if (simulatingDurationRef.current >= SCENE_PERIMETER_BOUNDS.maxSimulationWatchdogSeconds) {
+      resolveMatchOutcome(isP1OOB, isP2OOB);
+      return;
+    }
+
+    // Standard rest velocity detection
     const vel1 = p1RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
     const vel2 = p2RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
     const speed1 = Math.hypot(vel1.x, vel1.y, vel1.z);
@@ -181,56 +384,7 @@ export const MultiplayerGacoans: React.FC = () => {
       stillFramesRef.current += 1;
 
       if (stillFramesRef.current > 20) {
-        setAimingState('EVALUATING');
-        stillFramesRef.current = 0;
-        simulatingFramesRef.current = 0;
-
-        setTimeout(() => {
-          const t1 = p1RigidBodyRef.current?.translation();
-          const t2 = p2RigidBodyRef.current?.translation();
-          const p1Pos: [number, number, number] = t1 ? [t1.x, t1.y, t1.z] : [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
-          const p2Pos: [number, number, number] = t2 ? [t2.x, t2.y, t2.z] : [0.25, ARENA_CONFIG.marbleRadius, 2.3];
-
-          // 2. OFFICIAL PLAYING MATCH RESOLUTION
-          triggerEvaluation();
-
-          setTimeout(() => {
-            const activePos = currentTurnPlayerId === localPlayer.id ? (isHost ? p1Pos : p2Pos) : (isHost ? p2Pos : p1Pos);
-            evaluateTurnOutcome(activePos);
-
-            // Host broadcasts authoritative rest-state
-            if (isHost) {
-              const mpStore = useMultiplayerStore.getState();
-              const gameState = useGameStore.getState();
-              const isCombo = gameState.lastTurnOutcome?.resultType === 'COMBO_EXTRA_TURN';
-              const targetsPocketed = gameState.targetsPocketedThisTurn || 0;
-              const isHostTurn = mpStore.currentTurnPlayerId === mpStore.localPlayer.id;
-
-              const nextScores = {
-                host: isHostTurn ? mpStore.scores.host + targetsPocketed : mpStore.scores.host,
-                guest: !isHostTurn ? mpStore.scores.guest + targetsPocketed : mpStore.scores.guest,
-              };
-
-              const nextTurnId = isCombo
-                ? mpStore.currentTurnPlayerId!
-                : isHostTurn
-                ? (mpStore.remotePlayer?.id || mpStore.localPlayer.id)
-                : mpStore.localPlayer.id;
-
-              broadcastRestState({
-                turnIndex: gameState.turnCount,
-                gacoanP1Position: p1Pos,
-                gacoanP2Position: p2Pos,
-                targetPositions: gameState.targetLivePositions,
-                marblesOutsideRing: gameState.marblesOutsideRing,
-                scores: nextScores,
-                nextTurnPlayerId: nextTurnId,
-              });
-            }
-
-            setAimingState('IDLE');
-          }, 400);
-        }, 1500);
+        resolveMatchOutcome(false, false);
       }
     }
   });

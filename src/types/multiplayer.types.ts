@@ -46,6 +46,7 @@ export interface RestStatePayload {
     guest: number;
   };
   nextTurnPlayerId: string;
+  isMatchOver?: boolean;
 }
 
 export interface MatchInitPayload {
@@ -72,6 +73,7 @@ export type NetworkMessage =
   | { type: 'MATCH_START'; payload: MatchStartPayload }
   | { type: 'TOSS_SHOT'; payload: ShotNetworkPayload }
   | { type: 'TOSS_RESULT'; payload: TossResultPayload }
+  | { type: 'MATCH_PLAYING_START' }
   | { type: 'SHOT_FIRED'; payload: ShotNetworkPayload }
   | { type: 'REST_STATE_SYNC'; payload: RestStatePayload }
   | { type: 'PING'; timestamp: number }

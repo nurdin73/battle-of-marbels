@@ -20,6 +20,7 @@ export const ShooterMarble: React.FC = () => {
   const simulatingFrameCountRef = useRef<number>(0);
   const flightProgressRef = useRef<number>(0);
   const outOfSceneTimerRef = useRef<number>(0);
+  const simulatingDurationRef = useRef<number>(0);
 
   const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
   const aimingState = useGameStore((s) => s.aimingState);
@@ -149,10 +150,13 @@ export const ShooterMarble: React.FC = () => {
       translation.y < SCENE_PERIMETER_BOUNDS.minY;
 
     if (isOutOfScene && aimingState === 'SIMULATING') {
+      // Dampen velocity while falling out of bounds
+      rigidBodyRef.current.setLinvel({ x: 0, y: Math.max(-0.4, rigidBodyRef.current.linvel().y), z: 0 }, true);
       outOfSceneTimerRef.current += delta;
 
       if (outOfSceneTimerRef.current >= SCENE_PERIMETER_BOUNDS.outOfBoundsResetDelaySeconds) {
         outOfSceneTimerRef.current = 0;
+        simulatingDurationRef.current = 0;
         setAimingState('EVALUATING');
         stillFrameCountRef.current = 0;
         simulatingFrameCountRef.current = 0;
@@ -162,7 +166,7 @@ export const ShooterMarble: React.FC = () => {
           evaluationTimerRef.current = null;
         }
 
-        // Halt physics velocity immediately to prevent runaway falling into void
+        // Halt physics velocity immediately
         rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
         rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
 
@@ -192,10 +196,36 @@ export const ShooterMarble: React.FC = () => {
     if (aimingState !== 'SIMULATING') {
       stillFrameCountRef.current = 0;
       simulatingFrameCountRef.current = 0;
+      simulatingDurationRef.current = 0;
       return;
     }
 
     simulatingFrameCountRef.current += 1;
+    simulatingDurationRef.current += delta;
+
+    // Safety watchdog: if marble rolls or jitters indefinitely, force evaluation after maxSimulationWatchdogSeconds
+    if (simulatingDurationRef.current >= SCENE_PERIMETER_BOUNDS.maxSimulationWatchdogSeconds) {
+      simulatingDurationRef.current = 0;
+      stillFrameCountRef.current = 0;
+      simulatingFrameCountRef.current = 0;
+      setAimingState('EVALUATING');
+
+      rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+      triggerEvaluation();
+      setTimeout(() => {
+        const finalTrans = rigidBodyRef.current ? rigidBodyRef.current.translation() : null;
+        const finalPos: [number, number, number] = finalTrans
+          ? [finalTrans.x, finalTrans.y, finalTrans.z]
+          : INITIAL_SHOOTER_POS;
+
+        evaluateTurnOutcome(finalPos);
+        setAimingState('IDLE');
+      }, 400);
+      return;
+    }
+
     const linvel = rigidBodyRef.current.linvel();
     const speed = Math.hypot(linvel.x, linvel.y, linvel.z);
 
@@ -207,6 +237,7 @@ export const ShooterMarble: React.FC = () => {
         setAimingState('EVALUATING');
         stillFrameCountRef.current = 0;
         simulatingFrameCountRef.current = 0;
+        simulatingDurationRef.current = 0;
 
         if (evaluationTimerRef.current) {
           clearTimeout(evaluationTimerRef.current);

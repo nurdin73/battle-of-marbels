@@ -13,8 +13,8 @@ import { useGameStore, createTargetMarblesByCount } from './useGameStore';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { ARENA_CONFIG } from '../constants/physics.constants';
 
-const INITIAL_P1_POS: [number, number, number] = [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
-const INITIAL_P2_POS: [number, number, number] = [0.25, ARENA_CONFIG.marbleRadius, 2.3];
+export const INITIAL_P1_POS: [number, number, number] = [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
+export const INITIAL_P2_POS: [number, number, number] = [0.25, ARENA_CONFIG.marbleRadius, 2.3];
 
 interface MultiplayerStoreState {
   isMultiplayerActive: boolean;
@@ -47,6 +47,17 @@ interface MultiplayerStoreState {
   onRemoteShotReceived: ((payload: ShotNetworkPayload) => void) | null;
   onRemoteRestStateReceived: ((payload: RestStatePayload) => void) | null;
   onRemoteTossReceived: ((payload: ShotNetworkPayload) => void) | null;
+
+  // Match Over state for PvP
+  isMatchOver: boolean;
+
+  // Camera tracking mode in multiplayer PvP ('AUTO' tracks active gacoan, 'SELF' locks to local gacoan, 'OPPONENT' locks to opponent gacoan)
+  cameraFocusMode: 'AUTO' | 'SELF' | 'OPPONENT';
+  setCameraFocusMode: (mode: 'AUTO' | 'SELF' | 'OPPONENT') => void;
+
+  // Free Roam Camera Focus
+  cameraFocusTarget: [number, number, number] | null;
+  setCameraFocusTarget: (target: [number, number, number] | null) => void;
 
   // Actions
   openLobbyModal: () => void;
@@ -96,6 +107,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
           turnTimeLimitSeconds: msg.payload.turnTimeLimitSeconds,
           remotePlayer: msg.payload.hostPlayer,
           matchPhase: 'TOSS_PHASE',
+          isMatchOver: false,
+          cameraFocusMode: 'AUTO',
           tossShotDoneP1: false,
           tossShotDoneP2: false,
           tossResult: null,
@@ -107,7 +120,10 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
 
         // Initialize game arena with the exact target marbles & timer from Host
         useGameStore.getState().startMatchWithMarbleCount(msg.payload.targetCount, msg.payload.turnTimeLimitSeconds);
-        useGameStore.setState({ targetMarbles: msg.payload.initialTargetMarbles });
+        useGameStore.setState({
+          targetMarbles: msg.payload.initialTargetMarbles,
+          gacoanCurrentPos: INITIAL_P2_POS,
+        });
 
         // Send back guest info
         peerService.sendMessage({
@@ -122,6 +138,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         set({
           remotePlayer: msg.payload.guestPlayer,
           matchPhase: 'TOSS_PHASE',
+          isMatchOver: false,
+          cameraFocusMode: 'AUTO',
           tossShotDoneP1: false,
           tossShotDoneP2: false,
           tossResult: null,
@@ -133,16 +151,30 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
 
         // Initialize game arena on Host
         useGameStore.getState().startMatchWithMarbleCount(state.targetCount, state.turnTimeLimitSeconds);
+        useGameStore.setState({ gacoanCurrentPos: INITIAL_P1_POS });
         break;
       }
 
       case 'TOSS_SHOT': {
         // Opponent threw their toss shot
         marbleAudio.playLaunchSound(0.7);
-        if (state.role === 'HOST') {
-          set({ tossShotDoneP2: true });
+        const isHost = state.role === 'HOST';
+        const myShotAlreadyDone = isHost ? state.tossShotDoneP1 : state.tossShotDoneP2;
+
+        if (isHost) {
+          set({
+            tossShotDoneP2: true,
+            tossBannerMessage: myShotAlreadyDone
+              ? '⏳ Menunggu kedua gacoan berhenti bergulir...'
+              : 'Lawan telah melempar! Giliranmu melempar gacoan...',
+          });
         } else {
-          set({ tossShotDoneP1: true });
+          set({
+            tossShotDoneP1: true,
+            tossBannerMessage: myShotAlreadyDone
+              ? '⏳ Menunggu kedua gacoan berhenti bergulir...'
+              : 'Lawan telah melempar! Giliranmu melempar gacoan...',
+          });
         }
         if (state.onRemoteTossReceived) {
           state.onRemoteTossReceived(msg.payload);
@@ -154,19 +186,26 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         // Guest receives authoritative toss evaluation from Host
         const winnerName = msg.payload.firstTurnPlayerId === state.localPlayer.id ? 'KAMU' : 'LAWAN';
 
+        // Keep matchPhase in TOSS_PHASE until MATCH_PLAYING_START message arrives
         set({
-          matchPhase: 'PLAYING',
+          matchPhase: 'TOSS_PHASE',
           currentTurnPlayerId: msg.payload.firstTurnPlayerId,
           tossResult: msg.payload,
           tossBannerMessage: `🎉 ${winnerName} LEBIH DEKAT! (${msg.payload.p1Distance.toFixed(2)}m vs ${msg.payload.p2Distance.toFixed(2)}m) — GILIRAN PERTAMA!`,
         });
 
+        useGameStore.getState().setAimingState('IDLE');
         marbleAudio.playComboSound();
+        break;
+      }
 
-        // Clear banner message after 3.5s
-        setTimeout(() => {
-          set({ tossBannerMessage: null });
-        }, 3500);
+      case 'MATCH_PLAYING_START': {
+        // Match officially commences: target marbles appear cleanly now that toss settles
+        set({
+          matchPhase: 'PLAYING',
+          tossBannerMessage: null,
+        });
+        useGameStore.getState().setAimingState('IDLE');
         break;
       }
 
@@ -186,6 +225,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
           currentTurnPlayerId: msg.payload.nextTurnPlayerId,
           gacoanP1Pos: msg.payload.gacoanP1Position,
           gacoanP2Pos: msg.payload.gacoanP2Position,
+          isMatchOver: Boolean(msg.payload.isMatchOver),
         });
 
         // Reconcile marbles in game store
@@ -210,6 +250,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         set({
           rematchRequestedBy: null,
           matchPhase: 'TOSS_PHASE',
+          isMatchOver: false,
+          cameraFocusMode: 'AUTO',
           tossShotDoneP1: false,
           tossShotDoneP2: false,
           tossResult: null,
@@ -233,6 +275,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       // If we are Host, send MATCH_INIT with initialTargetMarbles
       if (state.role === 'HOST') {
         const initialTargets = createTargetMarblesByCount(state.targetCount);
+        useGameStore.setState({ targetMarbles: initialTargets });
         peerService.sendMessage({
           type: 'MATCH_INIT',
           payload: {
@@ -287,6 +330,11 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     onRemoteShotReceived: null,
     onRemoteRestStateReceived: null,
     onRemoteTossReceived: null,
+    isMatchOver: false,
+    cameraFocusMode: 'AUTO',
+    setCameraFocusMode: (mode) => set({ cameraFocusMode: mode }),
+    cameraFocusTarget: null,
+    setCameraFocusTarget: (target) => set({ cameraFocusTarget: target }),
 
     openLobbyModal: () => set({ isLobbyModalOpen: true, errorMessage: null }),
     closeLobbyModal: () => set({ isLobbyModalOpen: false }),
@@ -320,6 +368,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         gacoanP1Pos: INITIAL_P1_POS,
         gacoanP2Pos: INITIAL_P2_POS,
         currentTurnPlayerId: null,
+        isMatchOver: false,
+        cameraFocusMode: 'AUTO',
       });
 
       try {
@@ -355,6 +405,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         errorMessage: null,
         gacoanP1Pos: INITIAL_P1_POS,
         gacoanP2Pos: INITIAL_P2_POS,
+        isMatchOver: false,
+        cameraFocusMode: 'AUTO',
       });
 
       try {
@@ -381,16 +433,31 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         currentTurnPlayerId: null,
         tossResult: null,
         tossBannerMessage: null,
+        isMatchOver: false,
+        cameraFocusMode: 'AUTO',
       });
       useGameStore.getState().goToMainMenu();
     },
 
     broadcastTossShot: (payload: ShotNetworkPayload) => {
       const state = get();
-      if (state.role === 'HOST') {
-        set({ tossShotDoneP1: true });
+      const isHost = state.role === 'HOST';
+      const willBothBeDone = isHost ? state.tossShotDoneP2 : state.tossShotDoneP1;
+
+      if (isHost) {
+        set({
+          tossShotDoneP1: true,
+          tossBannerMessage: willBothBeDone
+            ? '⏳ Menunggu kedua gacoan berhenti bergulir...'
+            : 'Lemparan terkirim! Menunggu lemparan lawan...',
+        });
       } else {
-        set({ tossShotDoneP2: true });
+        set({
+          tossShotDoneP2: true,
+          tossBannerMessage: willBothBeDone
+            ? '⏳ Menunggu kedua gacoan berhenti bergulir...'
+            : 'Lemparan terkirim! Menunggu lemparan lawan...',
+        });
       }
       peerService.sendMessage({
         type: 'TOSS_SHOT',
@@ -411,6 +478,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         currentTurnPlayerId: payload.nextTurnPlayerId,
         gacoanP1Pos: payload.gacoanP1Position,
         gacoanP2Pos: payload.gacoanP2Position,
+        isMatchOver: Boolean(payload.isMatchOver),
       });
       peerService.sendMessage({
         type: 'REST_STATE_SYNC',
@@ -436,6 +504,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       set({
         rematchRequestedBy: null,
         matchPhase: 'TOSS_PHASE',
+        isMatchOver: false,
+        cameraFocusMode: 'AUTO',
         tossShotDoneP1: false,
         tossShotDoneP2: false,
         tossResult: null,

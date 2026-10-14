@@ -57,10 +57,11 @@ export const GAMEPLAY_CONFIG = {
 };
 
 export const SCENE_PERIMETER_BOUNDS = {
-  maxX: 5.6,
-  maxZ: 9.5,
-  minY: -0.5,
+  maxX: 5.5,
+  maxZ: 9.4,
+  minY: -0.1,
   outOfBoundsResetDelaySeconds: 2.0,
+  maxSimulationWatchdogSeconds: 7.0,
 };
 
 export const DEFAULT_SWIRL_COLORS = [

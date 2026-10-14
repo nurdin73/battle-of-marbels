@@ -18,11 +18,16 @@ export const MultiplayerHUD: React.FC = () => {
   const requestRematch = useMultiplayerStore((s) => s.requestRematch);
   const acceptRematch = useMultiplayerStore((s) => s.acceptRematch);
 
-  const isGameOver = useGameStore((s) => s.isGameOver);
+  const isMatchOver = useMultiplayerStore((s) => s.isMatchOver);
+  const targetCount = useMultiplayerStore((s) => s.targetCount);
+  const cameraFocusMode = useMultiplayerStore((s) => s.cameraFocusMode);
+  const setCameraFocusMode = useMultiplayerStore((s) => s.setCameraFocusMode);
   const currentScreen = useGameStore((s) => s.currentScreen);
   const matchPhase = useMultiplayerStore((s) => s.matchPhase);
   const tossBannerMessage = useMultiplayerStore((s) => s.tossBannerMessage);
   const turnTimeLimitSeconds = useMultiplayerStore((s) => s.turnTimeLimitSeconds);
+  const gacoanP1Pos = useMultiplayerStore((s) => s.gacoanP1Pos);
+  const gacoanP2Pos = useMultiplayerStore((s) => s.gacoanP2Pos);
   const turnTimer = useGameStore((s) => s.turnTimer);
 
   // Only show when in game and multiplayer is active
@@ -38,6 +43,7 @@ export const MultiplayerHUD: React.FC = () => {
   const p2Score = scores.guest;
   const myScore = isHost ? p1Score : p2Score;
   const opponentScore = isHost ? p2Score : p1Score;
+  const remainingMarbles = Math.max(0, targetCount - (p1Score + p2Score));
 
   const handleLeave = () => {
     if (window.confirm('Yakin ingin keluar dari pertandingan multiplayer?')) {
@@ -74,13 +80,24 @@ export const MultiplayerHUD: React.FC = () => {
               <span className="font-heading font-black text-xs leading-none truncate max-w-[70px] sm:max-w-[100px]">
                 {isHost ? localPlayer.name : remotePlayer?.name || 'Tuan Rumah'}
               </span>
-              <span className="text-[10px] font-bold opacity-80 leading-tight">Skor: {p1Score}</span>
+              <span className="text-[10px] font-bold opacity-90 leading-tight">
+                ⚪ {p1Score} Butir Didapat
+              </span>
             </div>
           </div>
 
-          {/* VS Divider */}
-          <div className="font-heading font-black text-stone-400 text-xs px-1">
-            VS
+          {/* VS Divider & Remaining Marbles */}
+          <div className="flex flex-col items-center px-1">
+            <span className="font-heading font-black text-stone-400 text-[10px]">VS</span>
+            {matchPhase === 'PLAYING' && (
+              <span
+                data-testid="multiplayer-remaining-marbles-badge"
+                className="text-[9px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded-full whitespace-nowrap shadow-xs"
+                title="Sisa kelereng di lingkaran arena"
+              >
+                🎯 Sisa: {remainingMarbles}
+              </span>
+            )}
           </div>
 
           {/* P2 Box (Guest - Red) */}
@@ -96,7 +113,9 @@ export const MultiplayerHUD: React.FC = () => {
               <span className="font-heading font-black text-xs leading-none truncate max-w-[70px] sm:max-w-[100px]">
                 {!isHost ? localPlayer.name : remotePlayer?.name || 'Lawan'}
               </span>
-              <span className="text-[10px] font-bold opacity-80 leading-tight">Skor: {p2Score}</span>
+              <span className="text-[10px] font-bold opacity-90 leading-tight">
+                ⚪ {p2Score} Butir Didapat
+              </span>
             </div>
             <div className="w-6 h-6 rounded-full bg-red-100 border border-red-400 flex items-center justify-center text-[11px] font-bold shadow-inner">
               🔴
@@ -168,10 +187,75 @@ export const MultiplayerHUD: React.FC = () => {
             </>
           )}
         </div>
+
+        {/* ROW 3: SPECTATOR FREE-ROAM CONTROLS (WHEN WAITING FOR OPPONENT) */}
+        {!isMyTurn && matchPhase === 'PLAYING' && (
+          <div
+            data-testid="multiplayer-spectator-controls"
+            className="flex items-center gap-1.5 bg-[#fdfbf7]/95 border-2 border-[#eee6dc] border-b-[3px] border-b-[#ded4c5] px-2.5 py-1 rounded-2xl shadow-md text-xs backdrop-blur-sm animate-in fade-in"
+          >
+            <span className="font-heading font-black text-stone-600 text-[11px] flex items-center gap-1 mr-1">
+              <span>🎥</span>
+              <span>Kamera:</span>
+            </span>
+
+            <button
+              data-testid="focus-auto-btn"
+              onClick={() => {
+                marbleAudio.playWoodKnockSound(1.0);
+                setCameraFocusMode('AUTO');
+              }}
+              className={`px-2 py-0.5 text-[10px] font-heading font-black rounded-lg transition-all active:translate-y-[1px] cursor-pointer ${
+                cameraFocusMode === 'AUTO'
+                  ? 'bg-amber-400 text-stone-900 shadow-sm border border-amber-500'
+                  : 'timbul-btn-cream text-stone-700'
+              }`}
+              title="Kamera otomatis mengikuti kelereng yang sedang aktif"
+            >
+              Auto
+            </button>
+
+            <button
+              data-testid="focus-opponent-btn"
+              onClick={() => {
+                marbleAudio.playWoodKnockSound(1.0);
+                setCameraFocusMode('OPPONENT');
+                const targetPos = isHost ? gacoanP2Pos : gacoanP1Pos;
+                useMultiplayerStore.getState().setCameraFocusTarget(targetPos);
+              }}
+              className={`px-2 py-0.5 text-[10px] font-heading font-black rounded-lg transition-all active:translate-y-[1px] cursor-pointer ${
+                cameraFocusMode === 'OPPONENT'
+                  ? 'bg-amber-400 text-stone-900 shadow-sm border border-amber-500'
+                  : 'timbul-btn-cream text-stone-700'
+              }`}
+              title="Fokuskan kamera mengikuti gacoan lawan secara realtime"
+            >
+              Lawan
+            </button>
+
+            <button
+              data-testid="focus-self-btn"
+              onClick={() => {
+                marbleAudio.playWoodKnockSound(1.0);
+                setCameraFocusMode('SELF');
+                const targetPos = isHost ? gacoanP1Pos : gacoanP2Pos;
+                useMultiplayerStore.getState().setCameraFocusTarget(targetPos);
+              }}
+              className={`px-2 py-0.5 text-[10px] font-heading font-black rounded-lg transition-all active:translate-y-[1px] cursor-pointer ${
+                cameraFocusMode === 'SELF'
+                  ? 'bg-amber-400 text-stone-900 shadow-sm border border-amber-500'
+                  : 'timbul-btn-cream text-stone-700'
+              }`}
+              title="Fokuskan kamera kembali ke gacoan saya"
+            >
+              Saya
+            </button>
+          </div>
+        )}
       </div>
 
       {/* MATCH OVER MODAL FOR MULTIPLAYER */}
-      {isGameOver && (
+      {isMatchOver && (
         <div
           data-testid="multiplayer-gameover-modal"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in select-none"
@@ -194,17 +278,72 @@ export const MultiplayerHUD: React.FC = () => {
               </p>
             </div>
 
-            {/* Score Comparison */}
-            <div className="flex items-center justify-center gap-6 w-full py-3 bg-stone-100 rounded-2xl border border-stone-200">
-              <div className="flex flex-col items-center">
-                <span className="text-[11px] font-bold text-stone-500">Kamu</span>
-                <span className="font-heading font-black text-2xl text-stone-900">{myScore}</span>
+            {/* Score & Marble Statistics Breakdown */}
+            <div
+              data-testid="multiplayer-marble-stats-card"
+              className="w-full bg-[#f4ece1] rounded-2xl border-2 border-[#e6dbc9] p-3.5 flex flex-col gap-2.5 text-left"
+            >
+              <div className="flex items-center justify-between text-xs font-bold text-stone-600 border-b border-stone-300/80 pb-2">
+                <span>Total Taruhan Di Arena</span>
+                <span className="font-heading font-black text-stone-900 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-600 inline-block" />
+                  {targetCount} Butir
+                </span>
               </div>
-              <div className="font-heading font-black text-stone-400 text-lg">VS</div>
-              <div className="flex flex-col items-center">
-                <span className="text-[11px] font-bold text-stone-500">Lawan</span>
-                <span className="font-heading font-black text-2xl text-stone-900">{opponentScore}</span>
+
+              {/* Player 1 (Host) Detail */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-blue-700 flex items-center gap-1">
+                  <span>🔵</span>
+                  <span className="truncate max-w-[120px]">
+                    {isHost ? localPlayer.name : remotePlayer?.name || 'Tuan Rumah'}
+                  </span>
+                  {isHost && <span className="text-[10px] text-blue-500 font-extrabold">(Kamu)</span>}
+                </span>
+                <span className="font-heading font-black text-stone-900">
+                  {p1Score} Butir{' '}
+                  <span className="text-[10px] text-stone-500 font-bold">
+                    ({Math.round((p1Score / Math.max(1, targetCount)) * 100)}%)
+                  </span>
+                </span>
               </div>
+
+              {/* Player 2 (Guest) Detail */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-red-700 flex items-center gap-1">
+                  <span>🔴</span>
+                  <span className="truncate max-w-[120px]">
+                    {!isHost ? localPlayer.name : remotePlayer?.name || 'Lawan'}
+                  </span>
+                  {!isHost && <span className="text-[10px] text-red-500 font-extrabold">(Kamu)</span>}
+                </span>
+                <span className="font-heading font-black text-stone-900">
+                  {p2Score} Butir{' '}
+                  <span className="text-[10px] text-stone-500 font-bold">
+                    ({Math.round((p2Score / Math.max(1, targetCount)) * 100)}%)
+                  </span>
+                </span>
+              </div>
+
+              {/* Sisa Kelereng (jika ada) */}
+              {remainingMarbles > 0 && (
+                <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1.5 border-t border-dashed border-stone-300">
+                  <span>Sisa Kelereng di Lingkaran</span>
+                  <span className="font-bold text-amber-800">{remainingMarbles} Butir</span>
+                </div>
+              )}
+            </div>
+
+            {/* Narrative Summary */}
+            <div
+              data-testid="multiplayer-result-narrative"
+              className="w-full text-xs font-bold text-stone-700 bg-amber-50/90 border border-amber-200/90 px-3 py-2 rounded-xl text-center leading-relaxed"
+            >
+              {myScore > opponentScore
+                ? `🏆 Selamat! Kamu berhasil merebut ${myScore} butir kelereng taruhan dari lawan!`
+                : myScore < opponentScore
+                ? `🎖️ Lawan berhasil merebut ${opponentScore} butir kelereng. Coba ajak tanding ulang!`
+                : `🤝 Pertandingan seimbang! Kalian sama-sama mendapatkan ${myScore} butir kelereng.`}
             </div>
 
             {/* Rematch Actions */}
