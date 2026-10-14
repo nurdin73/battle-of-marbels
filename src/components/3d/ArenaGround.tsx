@@ -5,15 +5,60 @@ import * as THREE from 'three';
 import { ARENA_CONFIG } from '../../constants/physics.constants';
 import { createChalkRingTexture } from '../../utils/chalkTexture.utils';
 
-interface DirtPatch {
+interface SoilMoundData {
   x: number;
   z: number;
-  radius: number;
-  color: string;
+  radiusX: number;
+  radiusZ: number;
+  height: number;
 }
 
 const GROUND_TEXTURE_URL = '/assets/textures/ground.webp';
 useTexture.preload(GROUND_TEXTURE_URL);
+
+// Curated 3D soil mound contours in outer pekarangan perimeter (strictly R >= 2.9m outside active arena ring R = 1.8m)
+const SOIL_MOUNDS: SoilMoundData[] = [
+  // North-West shade tree root hummock
+  { x: -4.0, z: -4.2, radiusX: 2.2, radiusZ: 2.0, height: 0.14 },
+  // North border undulation along bamboo fence
+  { x: 0.0, z: -4.8, radiusX: 2.4, radiusZ: 1.5, height: 0.10 },
+  // North-East fruit tree root hummock
+  { x: 4.0, z: -4.0, radiusX: 2.2, radiusZ: 2.0, height: 0.12 },
+  // East flank garden undulation behind terracotta pot and rocks
+  { x: 4.5, z: 0.0, radiusX: 1.8, radiusZ: 2.4, height: 0.10 },
+  // West flank garden undulation behind red bricks and pot
+  { x: -4.5, z: 0.0, radiusX: 1.8, radiusZ: 2.4, height: 0.10 },
+  // South-West backyard border behind player starting line
+  { x: -3.2, z: 4.6, radiusX: 2.0, radiusZ: 1.5, height: 0.10 },
+  // South-East backyard border behind player starting line
+  { x: 3.2, z: 4.6, radiusX: 2.0, radiusZ: 1.5, height: 0.10 },
+];
+
+/**
+ * Creates hemisphere mound geometry with planar UV coordinates aligned exactly with the base ground plane.
+ * This guarantees seamless ground texture continuation across 3D elevations without texture pinching or seams.
+ */
+function createMoundGeometry(mound: SoilMoundData, groundSize: number): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+  geom.scale(mound.radiusX, mound.height, mound.radiusZ);
+  geom.translate(mound.x, 0, mound.z);
+
+  const pos = geom.attributes.position;
+  const uvs = geom.attributes.uv;
+  const halfSize = groundSize / 2;
+
+  for (let i = 0; i < pos.count; i++) {
+    const wx = pos.getX(i);
+    const wz = pos.getZ(i);
+    const u = (wx + halfSize) / groundSize;
+    const v = (-wz + halfSize) / groundSize;
+    uvs.setXY(i, u, v);
+  }
+
+  uvs.needsUpdate = true;
+  geom.computeVertexNormals();
+  return geom;
+}
 
 export const ArenaGround: React.FC = () => {
   const ringRadius = ARENA_CONFIG.ringRadius;
@@ -33,39 +78,16 @@ export const ArenaGround: React.FC = () => {
     return createChalkRingTexture(ringRadius, chalkPlaneSize);
   }, [ringRadius, chalkPlaneSize]);
 
+  const moundGeometries = useMemo(() => {
+    return SOIL_MOUNDS.map((mound) => createMoundGeometry(mound, ARENA_CONFIG.groundSize));
+  }, []);
+
   useEffect(() => {
     return () => {
       chalkTexture.dispose();
+      moundGeometries.forEach((geom) => geom.dispose());
     };
-  }, [chalkTexture]);
-
-  // Organic flat soil patches creating natural dirt variation without protruding into marbles
-  const dirtPatches = useMemo<DirtPatch[]>(() => [
-    // North-West area
-    { x: -3.8, z: -4.0, radius: 2.2, color: '#3f1e0d' },
-    { x: -2.8, z: -3.2, radius: 1.5, color: '#4a240e' },
-
-    // North border area
-    { x: 0.2, z: -4.5, radius: 2.0, color: '#38180a' },
-    { x: -1.2, z: -3.6, radius: 1.4, color: '#4d2610' },
-
-    // North-East area
-    { x: 3.6, z: -3.8, radius: 2.1, color: '#3f1e0d' },
-    { x: 2.2, z: -3.2, radius: 1.3, color: '#4a240e' },
-
-    // East flank
-    { x: 4.1, z: -1.0, radius: 2.2, color: '#421f0e' },
-    { x: 3.2, z: 0.8, radius: 1.6, color: '#4d2610' },
-
-    // West flank
-    { x: -4.0, z: 0.5, radius: 2.0, color: '#421f0e' },
-    { x: -3.2, z: 2.2, radius: 1.5, color: '#4a240e' },
-
-    // South flanks (behind player starting position)
-    { x: -2.8, z: 4.2, radius: 1.8, color: '#38180a' },
-    { x: 2.6, z: 4.0, radius: 1.9, color: '#38180a' },
-    { x: 0.0, z: 4.8, radius: 2.4, color: '#3f1e0d' },
-  ], []);
+  }, [chalkTexture, moundGeometries]);
 
   return (
     <group name="arena-ground">
@@ -74,7 +96,7 @@ export const ArenaGround: React.FC = () => {
         {/* Solid Ground Plane Collider: Top surface exactly at Y = 0.0 */}
         <CuboidCollider args={[boundaryHalfSize, 0.05, boundaryHalfSize]} position={[0, -0.05, 0]} />
 
-        {/* Base flat yard soil plane with texture mapping */}
+        {/* Base flat yard soil plane with uniform texture mapping */}
         <mesh receiveShadow position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[ARENA_CONFIG.groundSize, ARENA_CONFIG.groundSize]} />
           <meshStandardMaterial
@@ -88,50 +110,33 @@ export const ArenaGround: React.FC = () => {
         <CuboidCollider args={[6.0, 0.5, 0.2]} position={[0, 0.5, 6.0]} />
       </RigidBody>
 
-      {/* 2. Flat Organic Soil Patches (Blended smoothly with base texture at Y = 0.001) */}
-      <group name="dirt-patches">
-        {dirtPatches.map((patch, idx) => (
-          <mesh
-            key={`patch-${idx}`}
-            position={[patch.x, 0.001, patch.z]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            receiveShadow
+      {/* 2. Natural 3D Soil Mound Contours (Differentiated solely by 3D elevation, sharing exact ground texture) */}
+      <group name="soil-mounds">
+        {moundGeometries.map((geometry, idx) => (
+          <RigidBody
+            key={`mound-${idx}`}
+            type="fixed"
+            colliders="hull"
+            friction={0.35}
+            restitution={0.35}
           >
-            <circleGeometry args={[patch.radius, 32]} />
-            <meshStandardMaterial
-              color={patch.color}
-              roughness={0.95}
-              transparent
-              opacity={0.35}
-            />
-          </mesh>
+            <mesh
+              geometry={geometry}
+              receiveShadow
+              castShadow
+            >
+              <meshStandardMaterial
+                map={groundTexture}
+                roughness={0.92}
+                metalness={0.02}
+              />
+            </mesh>
+          </RigidBody>
         ))}
       </group>
 
-      {/* 3. Swept Traditional Play Ring (Tanah Bersih Disapu Rata - semi-transparan di atas tekstur) */}
-      <mesh receiveShadow position={[0, 0.0015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[ringRadius * 1.05, 48]} />
-        <meshStandardMaterial
-          color="#6e391b"
-          roughness={0.95}
-          transparent
-          opacity={0.45}
-        />
-      </mesh>
-
-      {/* 4. Natural Earthen Rim (Bibir Lingkaran Sapuan Rata) */}
-      <mesh receiveShadow position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[ringRadius * 1.02, ringRadius * 1.15, 48]} />
-        <meshStandardMaterial
-          color="#451a03"
-          roughness={0.96}
-          transparent
-          opacity={0.4}
-        />
-      </mesh>
-
-      {/* 5. Authentic Chalk Ring Marker (Procedural chalk dust & stroke on dirt) */}
-      <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* 3. Authentic Chalk Ring Marker (Garis kapur batas sah arena kelereng tradisional tanpa pembeda warna tanah) */}
+      <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[chalkPlaneSize, chalkPlaneSize]} />
         <meshBasicMaterial
           map={chalkTexture}
@@ -140,7 +145,7 @@ export const ArenaGround: React.FC = () => {
         />
       </mesh>
 
-      {/* 7. South wooden border curb behind player */}
+      {/* 4. South wooden border curb behind player */}
       <mesh position={[0, 0.12, 6.0]}>
         <boxGeometry args={[12.0, 0.24, 0.2]} />
         <meshStandardMaterial color="#451a03" roughness={0.7} />
@@ -148,3 +153,4 @@ export const ArenaGround: React.FC = () => {
     </group>
   );
 };
+
