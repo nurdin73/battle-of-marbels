@@ -9,15 +9,14 @@ interface FoliageData {
 }
 
 const GRASS_MODELS = [
-  '/assets/gltf/Grass_1_A_Color1.gltf',
-  '/assets/gltf/Grass_1_B_Color1.gltf',
-  '/assets/gltf/Grass_2_A_Color1.gltf',
+  '/assets/playground/Grass/Flat_Grass_small.glb',
+  '/assets/playground/Grass/Flat_Grass_medium.glb',
+  '/assets/playground/Grass/Flat_Grass_large.glb',
 ];
 
 const BUSH_MODELS = [
-  '/assets/gltf/Bush_1_A_Color1.gltf',
-  '/assets/gltf/Bush_1_B_Color1.gltf',
-  '/assets/gltf/Bush_2_A_Color1.gltf',
+  '/assets/playground/Bushes/Flat_Bush_small.glb',
+  '/assets/playground/Bushes/Flat_Bush_with_Flowers.glb',
 ];
 
 // Preload assets for instant rendering without hitching
@@ -41,8 +40,8 @@ export const PekaranganGrass: React.FC = () => {
         if (radiusFromCenter <= 1.85) continue;
 
         if (isBush && i === 0) {
-          // Add a low-poly bush (scaled to natural garden bush size)
-          const bScale = 0.35 + Math.abs(Math.sin(x * 5 + z * 3)) * 0.18;
+          // Add a low-poly playground bush (scaled to natural garden bush size ~45-55cm)
+          const bScale = 0.32 + Math.abs(Math.sin(x * 5 + z * 3)) * 0.12;
           list.push({
             modelSrc: BUSH_MODELS[list.length % BUSH_MODELS.length],
             position: [x, 0, z],
@@ -50,12 +49,12 @@ export const PekaranganGrass: React.FC = () => {
             rotationY: (x * 4.3 + z * 2.7) % (Math.PI * 2),
           });
         } else {
-          // Add grass tuft (scaled to natural lawn / backyard height ~12-18cm)
-          const gScale = 0.28 + Math.abs(Math.cos(x * 4 + z * 7)) * 0.14;
+          // Add playground grass tuft (scaled to natural lawn / backyard height ~18-24cm)
+          const gScale = 0.14 + Math.abs(Math.cos(x * 4 + z * 7)) * 0.06;
           list.push({
             modelSrc: GRASS_MODELS[list.length % GRASS_MODELS.length],
             position: [x, 0, z],
-            scale: [gScale, gScale * 0.85, gScale],
+            scale: [gScale, gScale, gScale],
             rotationY: (x * 3.7 + z * 2.1) % (Math.PI * 2),
           });
         }

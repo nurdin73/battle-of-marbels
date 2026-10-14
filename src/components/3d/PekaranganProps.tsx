@@ -33,8 +33,8 @@ const ROCK_MODELS = [
 ];
 
 const TREE_MODELS = [
-  '/assets/gltf/Tree_1_A_Color1.gltf',
-  '/assets/gltf/Tree_2_A_Color1.gltf',
+  '/assets/playground/Trees/oak/Flat_Tree_Oak_large_green.glb',
+  '/assets/playground/Trees/oak/Flat_Tree_Oak_medium_green.glb',
 ];
 
 ROCK_MODELS.forEach((src) => useGLTF.preload(src));
@@ -191,8 +191,8 @@ export const PekaranganProps: React.FC = () => {
         restitution={0.42}
         onCollisionEnter={handleTreeCollision}
       >
-        <CylinderCollider args={[1.8, 0.38]} position={[-4.2, 1.8, -4.5]} />
-        <CylinderCollider args={[1.5, 0.28]} position={[4.2, 1.5, -4.2]} />
+        <CylinderCollider args={[1.8, 0.36]} position={[-4.2, 1.8, -4.5]} />
+        <CylinderCollider args={[1.5, 0.32]} position={[4.2, 1.5, -4.2]} />
       </RigidBody>
 
       {/* 3. Terracotta Pots Physical Layer (Hollow Earthenware Resonance, Moderate Bounce) */}
@@ -283,13 +283,13 @@ export const PekaranganProps: React.FC = () => {
         </mesh>
       </group>
 
-      {/* 2. GLTF Tropical Village Trees */}
+      {/* 2. Playground Flat Trees */}
       <group name="village-trees">
         {/* Main Shade Tree (North-West Framing) */}
         <group position={[-4.2, 0, -4.5]}>
           <Gltf
-            src="/assets/gltf/Tree_1_A_Color1.gltf"
-            scale={1.25}
+            src="/assets/playground/Trees/oak/Flat_Tree_Oak_large_green.glb"
+            scale={0.55}
             castShadow
             receiveShadow
           />
@@ -298,8 +298,8 @@ export const PekaranganProps: React.FC = () => {
         {/* Secondary Fruit Tree (North-East Framing) */}
         <group position={[4.2, 0, -4.2]}>
           <Gltf
-            src="/assets/gltf/Tree_2_A_Color1.gltf"
-            scale={1.15}
+            src="/assets/playground/Trees/oak/Flat_Tree_Oak_large_green.glb"
+            scale={0.58}
             rotation={[0, 1.2, 0]}
             castShadow
             receiveShadow
