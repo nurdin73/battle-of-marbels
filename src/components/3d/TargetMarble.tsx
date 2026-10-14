@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { MarbleEntity } from '../../types/physics.types';
-import { TARGET_MARBLE_PHYSICS, ARENA_CONFIG } from '../../constants/physics.constants';
+import { TARGET_MARBLE_PHYSICS, ARENA_CONFIG, SCENE_PERIMETER_BOUNDS } from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
@@ -15,6 +15,7 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const groupRef = useRef<THREE.Group>(null);
   const isOutsideRef = useRef<boolean>(false);
+  const outOfSceneTimerRef = useRef<number>(0);
   const [isCollected, setIsCollected] = useState<boolean>(false);
 
   const markMarbleOutsideRing = useGameStore((s) => s.markMarbleOutsideRing);
@@ -97,10 +98,29 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
   }, [evaluationEpoch, isCollected, marble.id, marble.radius, markMarbleOutsideRing]);
 
   // Handle shrink animation when collected & track live coordinates when settled/aiming
-  useFrame(() => {
-    if (rigidBodyRef.current && !isCollected && aimingState !== 'AIRBORNE' && aimingState !== 'SIMULATING') {
+  useFrame((_, delta) => {
+    if (rigidBodyRef.current && !isCollected) {
       const pos = rigidBodyRef.current.translation();
-      updateTargetLivePosition(marble.id, [pos.x, pos.y, pos.z]);
+
+      // Guard: If marble flies over the wall or falls out of scene, freeze after 2 seconds
+      const isOutOfScene =
+        Math.abs(pos.x) > SCENE_PERIMETER_BOUNDS.maxX ||
+        Math.abs(pos.z) > SCENE_PERIMETER_BOUNDS.maxZ ||
+        pos.y < SCENE_PERIMETER_BOUNDS.minY;
+
+      if (isOutOfScene) {
+        outOfSceneTimerRef.current += delta;
+        if (outOfSceneTimerRef.current >= SCENE_PERIMETER_BOUNDS.outOfBoundsResetDelaySeconds) {
+          rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        }
+      } else {
+        outOfSceneTimerRef.current = 0;
+      }
+
+      if (aimingState !== 'AIRBORNE' && aimingState !== 'SIMULATING') {
+        updateTargetLivePosition(marble.id, [pos.x, pos.y, pos.z]);
+      }
     }
 
     if (isCollected && groupRef.current) {

@@ -55,6 +55,13 @@ export const GAMEPLAY_CONFIG = {
   foulResetPosition: [0, 0.075, 2.3] as [number, number, number],
 };
 
+export const SCENE_PERIMETER_BOUNDS = {
+  maxX: 7.5,
+  maxZ: 7.5,
+  minY: -0.5,
+  outOfBoundsResetDelaySeconds: 2.0,
+};
+
 export const DEFAULT_SWIRL_COLORS = [
   '#ef4444', // Red
   '#3b82f6', // Blue

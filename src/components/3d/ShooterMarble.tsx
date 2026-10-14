@@ -2,7 +2,12 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
-import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS, GAMEPLAY_CONFIG } from '../../constants/physics.constants';
+import {
+  ARENA_CONFIG,
+  MARBLE_PHYSICAL_CONFIGS,
+  GAMEPLAY_CONFIG,
+  SCENE_PERIMETER_BOUNDS,
+} from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
@@ -14,6 +19,7 @@ export const ShooterMarble: React.FC = () => {
   const stillFrameCountRef = useRef<number>(0);
   const simulatingFrameCountRef = useRef<number>(0);
   const flightProgressRef = useRef<number>(0);
+  const outOfSceneTimerRef = useRef<number>(0);
 
   const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
   const aimingState = useGameStore((s) => s.aimingState);
@@ -37,6 +43,7 @@ export const ShooterMarble: React.FC = () => {
       evaluationTimerRef.current = null;
     }
     flightProgressRef.current = 0;
+    outOfSceneTimerRef.current = 0;
 
     if (rigidBodyRef.current) {
       rigidBodyRef.current.setTranslation(
@@ -134,6 +141,53 @@ export const ShooterMarble: React.FC = () => {
 
     const translation = rigidBodyRef.current.translation();
     updateGacoanPos([translation.x, translation.y, translation.z]);
+
+    // 1. Detect if marble is outside the perimeter walls or scene container bounds
+    const isOutOfScene =
+      Math.abs(translation.x) > SCENE_PERIMETER_BOUNDS.maxX ||
+      Math.abs(translation.z) > SCENE_PERIMETER_BOUNDS.maxZ ||
+      translation.y < SCENE_PERIMETER_BOUNDS.minY;
+
+    if (isOutOfScene && aimingState === 'SIMULATING') {
+      outOfSceneTimerRef.current += delta;
+
+      if (outOfSceneTimerRef.current >= SCENE_PERIMETER_BOUNDS.outOfBoundsResetDelaySeconds) {
+        outOfSceneTimerRef.current = 0;
+        setAimingState('EVALUATING');
+        stillFrameCountRef.current = 0;
+        simulatingFrameCountRef.current = 0;
+
+        if (evaluationTimerRef.current) {
+          clearTimeout(evaluationTimerRef.current);
+          evaluationTimerRef.current = null;
+        }
+
+        // Halt physics velocity immediately to prevent runaway falling into void
+        rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+        triggerEvaluation();
+
+        setTimeout(() => {
+          const finalPos: [number, number, number] = [translation.x, translation.y, translation.z];
+          evaluateTurnOutcome(finalPos);
+
+          const resetPos = GAMEPLAY_CONFIG.foulResetPosition;
+          if (rigidBodyRef.current) {
+            rigidBodyRef.current.setTranslation({ x: resetPos[0], y: resetPos[1], z: resetPos[2] }, true);
+            rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            updateGacoanPos(resetPos);
+          }
+
+          setAimingState('IDLE');
+        }, 300);
+
+        return;
+      }
+    } else {
+      outOfSceneTimerRef.current = 0;
+    }
 
     if (aimingState !== 'SIMULATING') {
       stillFrameCountRef.current = 0;

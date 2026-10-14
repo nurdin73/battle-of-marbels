@@ -9,6 +9,8 @@ import { TrajectoryLine } from './TrajectoryLine';
 import { CameraController } from './CameraController';
 import { PekaranganProps } from './PekaranganProps';
 import { PekaranganGrass } from './PekaranganGrass';
+import { PekaranganWall } from './PekaranganWall';
+import { SkyEnvironment } from './SkyEnvironment';
 import { LevelObstacles } from './LevelObstacles';
 import { useGameStore } from '../../store/useGameStore';
 
@@ -23,13 +25,16 @@ export const SceneContainer: React.FC = () => {
         camera={{ position: [0, 2.2, 3.8], fov: 50 }}
         gl={{ antialias: true, alpha: false }}
       >
-        <color attach="background" args={['#241913']} />
-        <fog attach="fog" args={['#241913', 12, 30]} />
+        <color attach="background" args={['#fed7aa']} />
+        <fog attach="fog" args={['#fed7aa', 25, 60]} />
 
         <Suspense fallback={null}>
+          <SkyEnvironment />
+
           <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
             <Lighting />
             <ArenaGround />
+            <PekaranganWall />
             <PekaranganProps />
             <PekaranganGrass />
             <LevelObstacles />
