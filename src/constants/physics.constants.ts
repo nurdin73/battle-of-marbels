@@ -28,7 +28,7 @@ export const MARBLE_PHYSICAL_CONFIGS: Record<MarbleMaterialType, MarblePhysicalP
 };
 
 export const TARGET_MARBLE_PHYSICS: MarblePhysicalProps = {
-  mass: 0.013,
+  mass: 0.020,
   restitution: 0.72,
   frictionStatic: 0.30,
   frictionDynamic: 0.22,
@@ -40,9 +40,9 @@ export const ARENA_CONFIG = {
   ringRadius: 1.8,
   groundSizeX: 12.0,
   groundSizeZ: 20.0,
-  marbleRadius: 0.082, // Default / Gacoan radius
-  gacoanMarbleRadius: 0.082, // Kelereng gacoan andalan pemain (lebih besar & berbobot)
-  targetMarbleRadius: 0.065, // Kelereng taruhan lingkaran (proporsional khas pot)
+  marbleRadius: 0.082, // Standard marble radius
+  gacoanMarbleRadius: 0.082, // Kelereng gacoan andalan pemain
+  targetMarbleRadius: 0.082, // Kelereng target lingkaran (disamakan seragam dengan gacoan)
   maxDragDistance: 0.75,
   forceExponent: 1.35,
   minImpulse: 0.0035,
