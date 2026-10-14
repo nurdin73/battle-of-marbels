@@ -1,6 +1,8 @@
 import { SceneContainer } from './components/3d/SceneContainer';
 import { HUDOverlay } from './components/ui/HUDOverlay';
 import { MainMenu } from './components/ui/MainMenu';
+import { MultiplayerLobbyModal } from './components/ui/MultiplayerLobbyModal';
+import { MultiplayerHUD } from './components/ui/MultiplayerHUD';
 import { useGameStore } from './store/useGameStore';
 
 export function App() {
@@ -16,6 +18,10 @@ export function App() {
 
       {/* 2D Interactive UI Layer: Main Menu vs In-Game HUD */}
       {currentScreen === 'MAIN_MENU' ? <MainMenu /> : <HUDOverlay />}
+
+      {/* Multiplayer Real-Time Overlays */}
+      <MultiplayerLobbyModal />
+      <MultiplayerHUD />
     </main>
   );
 }

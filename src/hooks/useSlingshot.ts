@@ -4,6 +4,7 @@ import { ThreeEvent, useThree } from '@react-three/fiber';
 import { RapierRigidBody } from '@react-three/rapier';
 import { useGameStore } from '../store/useGameStore';
 import { useCardStore } from '../store/useCardStore';
+import { useMultiplayerStore } from '../store/useMultiplayerStore';
 import { ARENA_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { calculateTrajectory } from '../utils/trajectory.utils';
@@ -130,6 +131,27 @@ export function useSlingshot(
         setAimingState('SIMULATING');
       }
 
+      // If multiplayer mode is active, broadcast shot to peer
+      const multiplayerStore = useMultiplayerStore.getState();
+      if (multiplayerStore.isMultiplayerActive) {
+        multiplayerStore.broadcastShot({
+          turnIndex: storeState.turnCount,
+          playerId: multiplayerStore.localPlayer.id,
+          timestamp: Date.now(),
+          impulse: {
+            x: normX * effectiveImpulse,
+            y: 0.0,
+            z: normZ * effectiveImpulse,
+          },
+          originPosition: {
+            x: shooterOrigin.x,
+            y: shooterOrigin.y,
+            z: shooterOrigin.z,
+          },
+          appliedCardId: activeCard?.id,
+        });
+      }
+
       // Consume active card after successful flick release
       if (activeCard) {
         cardStore.consumeActiveCard();
@@ -138,7 +160,9 @@ export function useSlingshot(
       // Sound & state
       marbleAudio.playLaunchSound(ratio);
       recordFlick();
-      setAimingState('AIRBORNE');
+      if (isLob) {
+        setAimingState('AIRBORNE');
+      }
       clearDrag();
       setLockedDirection(null);
     },
@@ -159,6 +183,16 @@ export function useSlingshot(
     (e: ThreeEvent<PointerEvent>) => {
       // Only allow aiming when game is active (PLAYING) and IDLE
       if (currentScreen !== 'PLAYING' || aimingState !== 'IDLE') return;
+
+      // In multiplayer mode, only allow aiming if it is the local player's turn
+      const multiplayerStore = useMultiplayerStore.getState();
+      if (multiplayerStore.isMultiplayerActive) {
+        const isMyTurn = multiplayerStore.currentTurnPlayerId === multiplayerStore.localPlayer.id;
+        if (!isMyTurn) {
+          marbleAudio.playWoodKnockSound(0.8);
+          return;
+        }
+      }
 
       e.stopPropagation();
       marbleAudio.startAmbientSound();

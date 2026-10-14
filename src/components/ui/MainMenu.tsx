@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { useLevelStore } from '../../store/useLevelStore';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { LevelSelectModal } from './LevelSelectModal';
 import { HelpModal } from './HelpModal';
 import { MatchSetupModal } from './MatchSetupModal';
@@ -188,7 +189,7 @@ export const MainMenu: React.FC = () => {
               data-testid="main-menu-multiplayer-btn"
               onClick={() => {
                 marbleAudio.playWoodKnockSound(1.1);
-                setIsMatchSetupOpen(true);
+                useMultiplayerStore.getState().openLobbyModal();
               }}
               className="w-full bg-[#ef4444] hover:bg-[#f87171] border-2 border-[#dc2626] border-b-[5px] border-b-[#991b1b] text-white font-heading font-black text-sm sm:text-base py-2.5 px-4 rounded-2xl shadow-md active:translate-y-[2px] active:border-b-[2px] transition-all cursor-pointer flex flex-col items-center justify-center"
             >
