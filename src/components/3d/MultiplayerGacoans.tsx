@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Html, useTexture } from '@react-three/drei';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS, SCENE_PERIMETER_BOUNDS } from '../../constants/physics.constants';
 import { useMultiplayerStore, INITIAL_P1_POS, INITIAL_P2_POS } from '../../store/useMultiplayerStore';
@@ -9,7 +9,20 @@ import { useGameStore } from '../../store/useGameStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
+const P1_MARBLE_TEXTURE_URL = '/assets/textures/marble-blue-white.png';
+const P2_MARBLE_TEXTURE_URL = '/assets/textures/marble-red-teal.png';
+useTexture.preload(P1_MARBLE_TEXTURE_URL);
+useTexture.preload(P2_MARBLE_TEXTURE_URL);
+
 export const MultiplayerGacoans: React.FC = () => {
+  const p1Texture = useTexture(P1_MARBLE_TEXTURE_URL);
+  const p2Texture = useTexture(P2_MARBLE_TEXTURE_URL);
+
+  useEffect(() => {
+    p1Texture.colorSpace = THREE.SRGBColorSpace;
+    p2Texture.colorSpace = THREE.SRGBColorSpace;
+  }, [p1Texture, p2Texture]);
+
   const p1RigidBodyRef = useRef<RapierRigidBody>(null);
   const p2RigidBodyRef = useRef<RapierRigidBody>(null);
   const p1BadgeRef = useRef<THREE.Group>(null);
@@ -482,28 +495,18 @@ export const MultiplayerGacoans: React.FC = () => {
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
 
-          {/* Translucent Glass Sphere (Gacoan Blue) */}
+          {/* Polished Glass Marble with Blue-White Texture */}
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[gacoanR, 32, 32]} />
+            <sphereGeometry args={[gacoanR, 48, 48]} />
             <meshPhysicalMaterial
-              roughness={0.04}
-              transmission={0.93}
-              thickness={0.55}
-              ior={1.53}
+              map={p1Texture}
+              roughness={0.06}
+              metalness={0.02}
               clearcoat={1.0}
-              attenuationColor={new THREE.Color('#38bdf8')}
-              attenuationDistance={0.45}
+              clearcoatRoughness={0.04}
+              reflectivity={0.96}
+              ior={1.53}
             />
-          </mesh>
-
-          {/* Blue Core Swirls */}
-          <mesh rotation={[0.48, 0.35, 0.15]}>
-            <torusGeometry args={[gacoanR * 0.52, gacoanR * 0.18, 16, 24]} />
-            <meshStandardMaterial color="#2563eb" roughness={0.2} metalness={0.2} />
-          </mesh>
-          <mesh rotation={[-0.45, -0.55, 0.9]}>
-            <torusGeometry args={[gacoanR * 0.46, gacoanR * 0.14, 16, 24]} />
-            <meshStandardMaterial color="#38bdf8" roughness={0.25} metalness={0.15} />
           </mesh>
         </group>
       </RigidBody>
@@ -530,28 +533,18 @@ export const MultiplayerGacoans: React.FC = () => {
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
 
-          {/* Translucent Glass Sphere (Gacoan Red) */}
+          {/* Polished Glass Marble with Red-Teal Texture */}
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[gacoanR, 32, 32]} />
+            <sphereGeometry args={[gacoanR, 48, 48]} />
             <meshPhysicalMaterial
-              roughness={0.04}
-              transmission={0.93}
-              thickness={0.55}
-              ior={1.53}
+              map={p2Texture}
+              roughness={0.06}
+              metalness={0.02}
               clearcoat={1.0}
-              attenuationColor={new THREE.Color('#f87171')}
-              attenuationDistance={0.45}
+              clearcoatRoughness={0.04}
+              reflectivity={0.96}
+              ior={1.53}
             />
-          </mesh>
-
-          {/* Crimson Red Core Swirls */}
-          <mesh rotation={[0.48, 0.35, 0.15]}>
-            <torusGeometry args={[gacoanR * 0.52, gacoanR * 0.18, 16, 24]} />
-            <meshStandardMaterial color="#dc2626" roughness={0.2} metalness={0.2} />
-          </mesh>
-          <mesh rotation={[-0.45, -0.55, 0.9]}>
-            <torusGeometry args={[gacoanR * 0.46, gacoanR * 0.14, 16, 24]} />
-            <meshStandardMaterial color="#f87171" roughness={0.25} metalness={0.15} />
           </mesh>
         </group>
       </RigidBody>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Html, useTexture } from '@react-three/drei';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
 import {
   ARENA_CONFIG,
@@ -14,6 +14,8 @@ import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
 const INITIAL_SHOOTER_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetPosition;
+const MARBLE_RED_TEAL_TEXTURE_URL = '/assets/textures/marble-red-teal.png';
+useTexture.preload(MARBLE_RED_TEAL_TEXTURE_URL);
 
 export const ShooterMarble: React.FC = () => {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
@@ -24,6 +26,11 @@ export const ShooterMarble: React.FC = () => {
   const flightProgressRef = useRef<number>(0);
   const outOfSceneTimerRef = useRef<number>(0);
   const simulatingDurationRef = useRef<number>(0);
+
+  const marbleTexture = useTexture(MARBLE_RED_TEAL_TEXTURE_URL);
+  useEffect(() => {
+    marbleTexture.colorSpace = THREE.SRGBColorSpace;
+  }, [marbleTexture]);
 
   const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
   const aimingState = useGameStore((s) => s.aimingState);
@@ -295,52 +302,18 @@ export const ShooterMarble: React.FC = () => {
     if (gacoanMaterial === 'GLASS_CLASSIC') {
       return (
         <group>
-          {/* Optical Clear Translucent Outer Glass Shell */}
+          {/* Polished Glass Marble with Red-Teal Marble Texture */}
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[gacoanR, 36, 36]} />
+            <sphereGeometry args={[gacoanR, 48, 48]} />
             <meshPhysicalMaterial
-              roughness={0.03}
-              transmission={0.94}
-              thickness={0.55}
-              ior={1.53}
-              reflectivity={0.95}
+              map={marbleTexture}
+              roughness={0.06}
+              metalness={0.02}
               clearcoat={1.0}
-              clearcoatRoughness={0.03}
-              attenuationColor={new THREE.Color('#38bdf8')}
-              attenuationDistance={0.45}
+              clearcoatRoughness={0.04}
+              reflectivity={0.96}
+              ior={1.53}
             />
-          </mesh>
-
-          {/* Primary Swirl Ribbon (Cobalt Blue Belimbing Vane) */}
-          <mesh rotation={[0.48, 0.35, 0.15]}>
-            <torusGeometry
-              args={[
-                gacoanR * 0.52,
-                gacoanR * 0.18,
-                16,
-                28,
-              ]}
-            />
-            <meshStandardMaterial color="#0284c7" roughness={0.2} metalness={0.2} />
-          </mesh>
-
-          {/* Counter-Swirl Ribbon (Electric Cyan Vane) */}
-          <mesh rotation={[-0.45, -0.55, 0.9]}>
-            <torusGeometry
-              args={[
-                gacoanR * 0.46,
-                gacoanR * 0.14,
-                16,
-                24,
-              ]}
-            />
-            <meshStandardMaterial color="#38bdf8" roughness={0.25} metalness={0.15} />
-          </mesh>
-
-          {/* Central Molten Amber Nucleus */}
-          <mesh>
-            <sphereGeometry args={[gacoanR * 0.18, 12, 12]} />
-            <meshStandardMaterial color="#f59e0b" roughness={0.2} metalness={0.3} />
           </mesh>
         </group>
       );
