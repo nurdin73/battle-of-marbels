@@ -38,7 +38,8 @@ export const TARGET_MARBLE_PHYSICS: MarblePhysicalProps = {
 
 export const ARENA_CONFIG = {
   ringRadius: 1.8,
-  groundSize: 16.0,
+  groundSizeX: 12.0,
+  groundSizeZ: 20.0,
   marbleRadius: 0.075,
   maxDragDistance: 0.75,
   forceExponent: 1.35,
@@ -56,8 +57,8 @@ export const GAMEPLAY_CONFIG = {
 };
 
 export const SCENE_PERIMETER_BOUNDS = {
-  maxX: 7.5,
-  maxZ: 7.5,
+  maxX: 5.6,
+  maxZ: 9.5,
   minY: -0.5,
   outOfBoundsResetDelaySeconds: 2.0,
 };

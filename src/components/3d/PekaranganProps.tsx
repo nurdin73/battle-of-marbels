@@ -45,11 +45,11 @@ export const PekaranganProps: React.FC = () => {
   const bambooPoles = useMemo<BambooPole[]>(() => {
     const poles: BambooPole[] = [];
 
-    // North Fence (Z = -5.8, X from -5.6 to 5.6)
-    for (let x = -5.6; x <= 5.6; x += 0.26) {
+    // North Fence (Z = -7.6, X from -4.2 to 4.2)
+    for (let x = -4.2; x <= 4.2; x += 0.26) {
       poles.push({
         x,
-        z: -5.8 + (Math.sin(x * 5) * 0.04),
+        z: -7.6 + (Math.sin(x * 5) * 0.04),
         height: 1.65 + (Math.sin(x * 7) * 0.22),
         radius: 0.045 + (Math.cos(x * 6) * 0.008),
         rotationY: Math.sin(x) * 0.2,
@@ -57,10 +57,10 @@ export const PekaranganProps: React.FC = () => {
       });
     }
 
-    // West Fence (X = -5.8, Z from -5.6 to 5.6)
-    for (let z = -5.6; z <= 5.6; z += 0.3) {
+    // West Fence (X = -4.4, Z from -7.6 to 7.6)
+    for (let z = -7.6; z <= 7.6; z += 0.3) {
       poles.push({
-        x: -5.8 + (Math.cos(z * 4) * 0.04),
+        x: -4.4 + (Math.cos(z * 4) * 0.04),
         z,
         height: 1.55 + (Math.cos(z * 6) * 0.2),
         radius: 0.042 + (Math.sin(z * 5) * 0.007),
@@ -69,10 +69,10 @@ export const PekaranganProps: React.FC = () => {
       });
     }
 
-    // East Fence (X = 5.8, Z from -5.6 to 5.6)
-    for (let z = -5.6; z <= 5.6; z += 0.3) {
+    // East Fence (X = 4.4, Z from -7.6 to 7.6)
+    for (let z = -7.6; z <= 7.6; z += 0.3) {
       poles.push({
-        x: 5.8 + (Math.sin(z * 4) * 0.04),
+        x: 4.4 + (Math.sin(z * 4) * 0.04),
         z,
         height: 1.58 + (Math.sin(z * 6) * 0.2),
         radius: 0.043 + (Math.cos(z * 5) * 0.007),
@@ -178,9 +178,9 @@ export const PekaranganProps: React.FC = () => {
         ))}
 
         {/* Low fence backstop ensuring zero marble penetration through any gaps */}
-        <CuboidCollider args={[5.8, 0.5, 0.05]} position={[0, 0.5, -5.8]} />
-        <CuboidCollider args={[0.05, 0.5, 5.8]} position={[-5.8, 0.5, 0]} />
-        <CuboidCollider args={[0.05, 0.5, 5.8]} position={[5.8, 0.5, 0]} />
+        <CuboidCollider args={[4.4, 0.5, 0.05]} position={[0, 0.5, -7.6]} />
+        <CuboidCollider args={[0.05, 0.5, 7.6]} position={[-4.4, 0.5, 0]} />
+        <CuboidCollider args={[0.05, 0.5, 7.6]} position={[4.4, 0.5, 0]} />
       </RigidBody>
 
       {/* 2. Tree Trunks Physical Layer (Damped / Low Restitution Bark Absorption, Deep Thud) */}
@@ -191,8 +191,8 @@ export const PekaranganProps: React.FC = () => {
         restitution={0.42}
         onCollisionEnter={handleTreeCollision}
       >
-        <CylinderCollider args={[1.8, 0.36]} position={[-4.2, 1.8, -4.5]} />
-        <CylinderCollider args={[1.5, 0.32]} position={[4.2, 1.5, -4.2]} />
+        <CylinderCollider args={[1.8, 0.36]} position={[-3.6, 1.8, -6.5]} />
+        <CylinderCollider args={[1.5, 0.32]} position={[3.6, 1.5, -6.2]} />
       </RigidBody>
 
       {/* 3. Terracotta Pots Physical Layer (Hollow Earthenware Resonance, Moderate Bounce) */}
@@ -253,32 +253,32 @@ export const PekaranganProps: React.FC = () => {
         ))}
 
         {/* Horizontal Bamboo Crossbars (North) */}
-        <mesh position={[0, 0.55, -5.8]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.038, 0.038, 11.6, 8]} />
+        <mesh position={[0, 0.55, -7.6]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.038, 0.038, 8.8, 8]} />
           <meshStandardMaterial color="#854d0e" roughness={0.8} />
         </mesh>
-        <mesh position={[0, 1.15, -5.8]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.035, 0.035, 11.6, 8]} />
+        <mesh position={[0, 1.15, -7.6]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.035, 0.035, 8.8, 8]} />
           <meshStandardMaterial color="#854d0e" roughness={0.8} />
         </mesh>
 
         {/* Horizontal Bamboo Crossbars (West) */}
-        <mesh position={[-5.8, 0.55, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.036, 0.036, 11.6, 8]} />
+        <mesh position={[-4.4, 0.55, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.036, 0.036, 15.4, 8]} />
           <meshStandardMaterial color="#854d0e" roughness={0.8} />
         </mesh>
-        <mesh position={[-5.8, 1.15, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.034, 0.034, 11.6, 8]} />
+        <mesh position={[-4.4, 1.15, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.034, 0.034, 15.4, 8]} />
           <meshStandardMaterial color="#854d0e" roughness={0.8} />
         </mesh>
 
         {/* Horizontal Bamboo Crossbars (East) */}
-        <mesh position={[5.8, 0.55, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.036, 0.036, 11.6, 8]} />
+        <mesh position={[4.4, 0.55, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.036, 0.036, 15.4, 8]} />
           <meshStandardMaterial color="#854d0e" roughness={0.8} />
         </mesh>
-        <mesh position={[5.8, 1.15, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.034, 0.034, 11.6, 8]} />
+        <mesh position={[4.4, 1.15, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.034, 0.034, 15.4, 8]} />
           <meshStandardMaterial color="#854d0e" roughness={0.8} />
         </mesh>
       </group>
@@ -286,7 +286,7 @@ export const PekaranganProps: React.FC = () => {
       {/* 2. Playground Flat Trees */}
       <group name="village-trees">
         {/* Main Shade Tree (North-West Framing) */}
-        <group position={[-4.2, 0, -4.5]}>
+        <group position={[-3.6, 0, -6.5]}>
           <Gltf
             src="/assets/playground/Trees/oak/Flat_Tree_Oak_small_green.glb"
             scale={0.55}
@@ -296,7 +296,7 @@ export const PekaranganProps: React.FC = () => {
         </group>
 
         {/* Secondary Fruit Tree (North-East Framing) */}
-        <group position={[4.2, 0, -4.2]}>
+        <group position={[3.6, 0, -6.2]}>
           <Gltf
             src="/assets/playground/Trees/oak/Flat_Tree_Oak_large_green.glb"
             scale={0.58}

@@ -64,67 +64,72 @@ export const PekaranganCornerGrass: React.FC = () => {
       }
     };
 
-    // 1. North-West Yard Corner (Deep corner behind large Oak tree and bamboo fence)
+    // 1. North-West Yard Corner (Deep corner behind large Oak tree, bamboo fence, and brick wall junction)
     const nwAnchors: [number, number, boolean][] = [
-      [-5.5, -5.8, true],
-      [-6.2, -5.5, false],
-      [-5.8, -6.4, true],
-      [-6.6, -6.6, true],
-      [-6.8, -5.9, false],
-      [-6.1, -7.0, false],
-      [-5.2, -6.8, false],
+      [-4.5, -7.8, true],
+      [-5.0, -7.5, false],
+      [-4.8, -8.4, true],
+      [-5.2, -8.8, true],
+      [-4.6, -9.1, false],
+      [-5.1, -8.2, false],
+      [-4.2, -8.6, false],
     ];
     nwAnchors.forEach(([x, z, hasBush]) => addCornerCluster(x, z, 4, 0.42, hasBush));
 
-    // 2. North-East Yard Corner (Corner behind fruit tree and garden rocks)
+    // 2. North-East Yard Corner (Corner behind fruit tree, bamboo fence, and brick wall junction)
     const neAnchors: [number, number, boolean][] = [
-      [5.5, -5.8, true],
-      [6.2, -5.5, false],
-      [5.8, -6.4, true],
-      [6.6, -6.6, true],
-      [6.8, -5.9, false],
-      [6.1, -7.0, false],
-      [5.2, -6.8, false],
+      [4.5, -7.8, true],
+      [5.0, -7.5, false],
+      [4.8, -8.4, true],
+      [5.2, -8.8, true],
+      [4.6, -9.1, false],
+      [5.1, -8.2, false],
+      [4.2, -8.6, false],
     ];
     neAnchors.forEach(([x, z, hasBush]) => addCornerCluster(x, z, 4, 0.42, hasBush));
 
-    // 3. South-West Yard Corner (Behind player baseline, wooden curb, and side brick wall)
+    // 3. South-West Yard Corner (Behind player baseline and side brick wall junction)
     const swAnchors: [number, number, boolean][] = [
-      [-5.5, 5.4, true],
-      [-6.2, 5.6, false],
-      [-5.8, 6.3, true],
-      [-6.6, 6.6, true],
-      [-6.8, 5.8, false],
-      [-6.0, 6.9, false],
-      [-5.2, 6.8, false],
+      [-4.5, 7.8, true],
+      [-5.0, 7.5, false],
+      [-4.8, 8.4, true],
+      [-5.2, 8.8, true],
+      [-4.6, 9.1, false],
+      [-5.1, 8.2, false],
+      [-4.2, 8.6, false],
     ];
     swAnchors.forEach(([x, z, hasBush]) => addCornerCluster(x, z, 4, 0.42, hasBush));
 
-    // 4. South-East Yard Corner (Behind player baseline, right side corner)
+    // 4. South-East Yard Corner (Behind player baseline and side brick wall junction)
     const seAnchors: [number, number, boolean][] = [
-      [5.5, 5.4, true],
-      [6.2, 5.6, false],
-      [5.8, 6.3, true],
-      [6.6, 6.6, true],
-      [6.8, 5.8, false],
-      [6.0, 6.9, false],
-      [5.2, 6.8, false],
+      [4.5, 7.8, true],
+      [5.0, 7.5, false],
+      [4.8, 8.4, true],
+      [5.2, 8.8, true],
+      [4.6, 9.1, false],
+      [5.1, 8.2, false],
+      [4.2, 8.6, false],
     ];
     seAnchors.forEach(([x, z, hasBush]) => addCornerCluster(x, z, 4, 0.42, hasBush));
 
     // 5. Perimeter Wall Crevices (Wild grass sprouting at the ground-wall junction)
     const wallCreviceAnchors: [number, number][] = [
-      [-3.2, -7.1],
-      [0.0, -7.1],
-      [3.2, -7.1],
-      [-7.1, -3.2],
-      [-7.1, 0.0],
-      [-7.1, 3.2],
-      [7.1, -3.2],
-      [7.1, 0.0],
-      [7.1, 3.2],
-      [-3.2, 7.1],
-      [3.2, 7.1],
+      [-2.6, -9.2],
+      [0.0, -9.2],
+      [2.6, -9.2],
+      [-5.2, -5.5],
+      [-5.2, -2.5],
+      [-5.2, 0.0],
+      [-5.2, 2.5],
+      [-5.2, 5.5],
+      [5.2, -5.5],
+      [5.2, -2.5],
+      [5.2, 0.0],
+      [5.2, 2.5],
+      [5.2, 5.5],
+      [-2.6, 9.2],
+      [0.0, 9.2],
+      [2.6, 9.2],
     ];
     wallCreviceAnchors.forEach(([x, z]) => addCornerCluster(x, z, 3, 0.32, false));
 

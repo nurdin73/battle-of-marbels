@@ -11,6 +11,7 @@ import { PekaranganProps } from './PekaranganProps';
 import { PekaranganGrass } from './PekaranganGrass';
 import { PekaranganCornerGrass } from './PekaranganCornerGrass';
 import { PekaranganWall } from './PekaranganWall';
+import { PekaranganBenches } from './PekaranganBenches';
 import { SkyEnvironment } from './SkyEnvironment';
 import { LevelObstacles } from './LevelObstacles';
 import { useGameStore } from '../../store/useGameStore';
@@ -37,6 +38,7 @@ export const SceneContainer: React.FC = () => {
             <ArenaGround />
             <PekaranganWall />
             <PekaranganProps />
+            <PekaranganBenches />
             <PekaranganGrass />
             <PekaranganCornerGrass />
             <LevelObstacles />

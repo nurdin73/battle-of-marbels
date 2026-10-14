@@ -74,16 +74,16 @@ export const PekaranganGrass: React.FC = () => {
       addCluster(x, z, 3, 0.32, idx % 4 === 0);
     });
 
-    // 2. Bushes & Grass around Banana Tree Clumps
-    addCluster(-3.8, -3.8, 5, 0.7, true);
-    addCluster(-3.3, -3.4, 4, 0.5, false);
-    addCluster(3.9, -1.2, 5, 0.65, true);
-    addCluster(3.6, -4.2, 5, 0.6, true);
+    // 2. Bushes & Grass around Plant Clumps
+    addCluster(-3.6, -4.5, 5, 0.7, true);
+    addCluster(-3.2, -4.0, 4, 0.5, false);
+    addCluster(3.8, -2.5, 5, 0.65, true);
+    addCluster(3.5, -4.5, 5, 0.6, true);
 
     // 3. Grass & Bushes around Main Trees
-    addCluster(-4.2, -4.5, 6, 0.85, true);
-    addCluster(-4.0, -4.0, 4, 0.6, false);
-    addCluster(4.2, -4.2, 5, 0.7, true);
+    addCluster(-3.6, -6.5, 6, 0.85, true);
+    addCluster(-3.4, -6.0, 4, 0.6, false);
+    addCluster(3.6, -6.2, 5, 0.7, true);
 
     // 4. Foliage near Terracotta Pots and Bricks
     addCluster(-2.7, -2.4, 3, 0.4, false);
@@ -93,17 +93,17 @@ export const PekaranganGrass: React.FC = () => {
     addCluster(2.6, -2.9, 3, 0.45, false);
 
     // 5. Grass & Bushes along Bamboo Fence perimeter (North, West, East)
-    for (let x = -5.0; x <= 5.0; x += 1.2) {
-      addCluster(x, -5.5 + Math.sin(x * 3) * 0.15, 2, 0.25, Math.abs(x) > 2);
+    for (let x = -3.8; x <= 3.8; x += 1.2) {
+      addCluster(x, -7.3 + Math.sin(x * 3) * 0.15, 2, 0.25, Math.abs(x) > 1.8);
     }
-    for (let z = -4.8; z <= 4.8; z += 1.3) {
-      addCluster(-5.5 + Math.cos(z * 3) * 0.15, z, 2, 0.25, Math.abs(z) > 1.5);
-      addCluster(5.5 + Math.sin(z * 4) * 0.15, z, 2, 0.25, Math.abs(z) > 1.5);
+    for (let z = -6.8; z <= 6.8; z += 1.3) {
+      addCluster(-4.1 + Math.cos(z * 3) * 0.15, z, 2, 0.25, Math.abs(z) > 2);
+      addCluster(4.1 + Math.sin(z * 4) * 0.15, z, 2, 0.25, Math.abs(z) > 2);
     }
 
     // 6. Yard outskirts & behind player starting line
-    for (let x = -4.2; x <= 4.2; x += 1.8) {
-      addCluster(x, 4.4 + Math.sin(x * 5) * 0.25, 2, 0.35, false);
+    for (let x = -3.8; x <= 3.8; x += 1.5) {
+      addCluster(x, 7.0 + Math.sin(x * 5) * 0.25, 2, 0.35, false);
     }
 
     return list;
