@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { useGameStore } from '../../store/useGameStore';
+import { usePlayerWalletStore } from '../../store/usePlayerWalletStore';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 import { LogOut, RotateCcw, Trophy } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export const MultiplayerHUD: React.FC = () => {
   const acceptRematch = useMultiplayerStore((s) => s.acceptRematch);
 
   const isMatchOver = useMultiplayerStore((s) => s.isMatchOver);
+  const betAmount = useMultiplayerStore((s) => s.betAmount);
   const targetCount = useMultiplayerStore((s) => s.targetCount);
   const cameraFocusMode = useMultiplayerStore((s) => s.cameraFocusMode);
   const setCameraFocusMode = useMultiplayerStore((s) => s.setCameraFocusMode);
@@ -29,6 +31,8 @@ export const MultiplayerHUD: React.FC = () => {
   const gacoanP1Pos = useMultiplayerStore((s) => s.gacoanP1Pos);
   const gacoanP2Pos = useMultiplayerStore((s) => s.gacoanP2Pos);
   const turnTimer = useGameStore((s) => s.turnTimer);
+
+  const walletBalance = usePlayerWalletStore((s) => s.balance);
 
   // Only show when in game and multiplayer is active
   if (!isMultiplayerActive || currentScreen !== 'PLAYING' || roomStatus !== 'CONNECTED') {
@@ -334,10 +338,39 @@ export const MultiplayerHUD: React.FC = () => {
               )}
             </div>
 
+            {/* Wager & Payout Accounting Card */}
+            <div
+              data-testid="multiplayer-wager-accounting-card"
+              className="w-full bg-amber-50/95 rounded-2xl border-2 border-amber-300 p-3 flex flex-col gap-1.5 text-xs text-left shadow-xs"
+            >
+              <div className="flex items-center justify-between text-stone-700 font-bold">
+                <span>Taruhan Disetor:</span>
+                <span className="text-red-600 font-black">-{betAmount} Butir</span>
+              </div>
+              <div className="flex items-center justify-between text-stone-700 font-bold">
+                <span>Kelereng yang Kamu Rebut:</span>
+                <span className="text-emerald-600 font-black">+{myScore} Butir</span>
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-amber-200/90 font-heading font-black">
+                <span>Hasil Bersih:</span>
+                <span className={myScore - betAmount >= 0 ? 'text-emerald-700 font-black' : 'text-red-700 font-black'}>
+                  {myScore - betAmount >= 0 ? `+${myScore - betAmount}` : `${myScore - betAmount}`} Butir
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-dashed border-amber-300 font-heading font-black text-amber-950">
+                <span className="flex items-center gap-1">
+                  <span>⚪</span> Saldo Dompet Sekarang:
+                </span>
+                <span className="text-sm bg-white px-2 py-0.5 rounded-lg border border-amber-300 shadow-inner">
+                  {walletBalance} Butir
+                </span>
+              </div>
+            </div>
+
             {/* Narrative Summary */}
             <div
               data-testid="multiplayer-result-narrative"
-              className="w-full text-xs font-bold text-stone-700 bg-amber-50/90 border border-amber-200/90 px-3 py-2 rounded-xl text-center leading-relaxed"
+              className="w-full text-xs font-bold text-stone-700 bg-[#fdfbf7] border border-amber-200/90 px-3 py-2 rounded-xl text-center leading-relaxed"
             >
               {myScore > opponentScore
                 ? `🏆 Selamat! Kamu berhasil merebut ${myScore} butir kelereng taruhan dari lawan!`
@@ -352,19 +385,29 @@ export const MultiplayerHUD: React.FC = () => {
                 <button
                   data-testid="multiplayer-accept-rematch-btn"
                   onClick={acceptRematch}
-                  className="w-full bg-[#84cc16] hover:bg-[#94dc26] border-2 border-[#65a30d] border-b-[4px] border-b-[#3f6212] text-white font-heading font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  disabled={walletBalance < betAmount}
+                  className="w-full bg-[#84cc16] hover:bg-[#94dc26] border-2 border-[#65a30d] border-b-[4px] border-b-[#3f6212] text-white font-heading font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>Terima Tanding Ulang!</span>
+                  <span>
+                    {walletBalance < betAmount
+                      ? `Kelereng Tidak Cukup (${walletBalance}/${betAmount})`
+                      : `Terima Tanding Ulang (${betAmount} Butir)!`}
+                  </span>
                 </button>
               ) : (
                 <button
                   data-testid="multiplayer-request-rematch-btn"
                   onClick={requestRematch}
-                  className="w-full bg-[#0284c7] hover:bg-[#38bdf8] border-2 border-[#0369a1] border-b-[4px] border-b-[#075985] text-white font-heading font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  disabled={walletBalance < betAmount}
+                  className="w-full bg-[#0284c7] hover:bg-[#38bdf8] border-2 border-[#0369a1] border-b-[4px] border-b-[#075985] text-white font-heading font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>Ajak Tanding Ulang</span>
+                  <span>
+                    {walletBalance < betAmount
+                      ? `Kelereng Tidak Cukup (${walletBalance}/${betAmount})`
+                      : `Ajak Tanding Ulang (${betAmount} Butir)`}
+                  </span>
                 </button>
               )}
 

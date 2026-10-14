@@ -52,7 +52,8 @@ export interface RestStatePayload {
 export interface MatchInitPayload {
   roomId: string;
   randomSeed: number;
-  targetCount: number;
+  betAmount: number; // Taruhan per pemain (misal 5)
+  targetCount: number; // Total kelereng di arena = betAmount * 2 (misal 10)
   turnTimeLimitSeconds: number | null; // 15, 20, 30, or null (Santai)
   hostPlayer: PlayerInfo;
   initialTargetMarbles: MarbleEntity[];

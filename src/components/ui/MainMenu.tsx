@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { useLevelStore } from '../../store/useLevelStore';
 import { useMultiplayerStore } from '../../store/useMultiplayerStore';
+import { usePlayerWalletStore } from '../../store/usePlayerWalletStore';
 import { LevelSelectModal } from './LevelSelectModal';
 import { HelpModal } from './HelpModal';
 import { MatchSetupModal } from './MatchSetupModal';
@@ -20,6 +21,7 @@ export const MainMenu: React.FC = () => {
   const isMuted = useGameStore((s) => s.isMuted);
   const toggleMute = useGameStore((s) => s.toggleMute);
   const openLevelSelectModal = useLevelStore((s) => s.openLevelSelectModal);
+  const walletBalance = usePlayerWalletStore((s) => s.balance);
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isMatchSetupOpen, setIsMatchSetupOpen] = useState(false);
@@ -77,19 +79,35 @@ export const MainMenu: React.FC = () => {
         {/* TOP BAR: Player Profile (Left) & Rival / Friend (Right)                   */}
         {/* ========================================================================= */}
         <header className="flex items-center justify-between w-full pointer-events-auto">
-          {/* Left: Player Profile Pill */}
-          <div
-            onClick={() => handleShowNotice('Profil Pemain: Jawara Kelereng Pekarangan')}
-            className="timbul-btn-cream px-3 py-1.5 flex items-center gap-2.5 cursor-pointer shadow-sm active:translate-y-[1px]"
-            title="Profil Pemain"
-          >
-            {/* Avatar Circle */}
-            <div className="w-8 h-8 rounded-full bg-amber-200 border-2 border-amber-400 flex items-center justify-center overflow-hidden shadow-inner text-amber-900 font-bold text-xs">
-              👦
+          {/* Left: Player Profile Pill & Marble Wallet */}
+          <div className="flex items-center gap-2">
+            <div
+              onClick={() => handleShowNotice('Profil Pemain: Jawara Kelereng Pekarangan')}
+              className="timbul-btn-cream px-3 py-1.5 flex items-center gap-2.5 cursor-pointer shadow-sm active:translate-y-[1px]"
+              title="Profil Pemain"
+            >
+              {/* Avatar Circle */}
+              <div className="w-8 h-8 rounded-full bg-amber-200 border-2 border-amber-400 flex items-center justify-center overflow-hidden shadow-inner text-amber-900 font-bold text-xs">
+                👦
+              </div>
+              <div className="flex items-center gap-1.5 text-stone-700 font-heading font-black text-xs sm:text-sm">
+                <User className="w-4 h-4 text-stone-500" />
+                <span>PROFIL</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-stone-700 font-heading font-black text-xs sm:text-sm">
-              <User className="w-4 h-4 text-stone-500" />
-              <span>PROFIL</span>
+
+            {/* Marble Wallet Pill */}
+            <div
+              onClick={() => handleShowNotice(`Dompet Kelereng: Kamu memiliki ${walletBalance} butir kelereng taruhan!`)}
+              className="timbul-btn-cream px-3 py-1.5 flex items-center gap-2 cursor-pointer shadow-sm active:translate-y-[1px]"
+              title="Dompet Kelereng Taruhan"
+            >
+              <div className="w-6 h-6 rounded-full bg-white border border-amber-400 flex items-center justify-center text-xs shadow-inner">
+                ⚪
+              </div>
+              <span className="font-heading font-black text-xs sm:text-sm text-stone-900">
+                {walletBalance} <span className="text-[10px] text-stone-500 font-bold">Bola</span>
+              </span>
             </div>
           </div>
 

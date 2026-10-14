@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMultiplayerStore } from '../../store/useMultiplayerStore';
+import { usePlayerWalletStore } from '../../store/usePlayerWalletStore';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 import { Copy, Check, Users, Sparkles, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
@@ -24,8 +25,11 @@ export const MultiplayerLobbyModal: React.FC = () => {
   const leaveRoom = useMultiplayerStore((s) => s.leaveRoom);
   const setLocalPlayerName = useMultiplayerStore((s) => s.setLocalPlayerName);
 
+  const walletBalance = usePlayerWalletStore((s) => s.balance);
+  const refillBalance = usePlayerWalletStore((s) => s.refillBalance);
+
   const [activeTab, setActiveTab] = useState<'HOST' | 'JOIN'>('HOST');
-  const [selectedTargetCount, setSelectedTargetCount] = useState<number>(9);
+  const [selectedBetAmount, setSelectedBetAmount] = useState<number>(5);
   const [selectedTimer, setSelectedTimer] = useState<number | null>(20);
   const [inputCode, setInputCode] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
@@ -55,7 +59,7 @@ export const MultiplayerLobbyModal: React.FC = () => {
   const handleStartHosting = async () => {
     marbleAudio.playWoodKnockSound(1.2);
     setLocalPlayerName(playerNameInput);
-    await hostRoom(selectedTargetCount, selectedTimer);
+    await hostRoom(selectedBetAmount, selectedTimer);
   };
 
   const handleJoin = async () => {
@@ -121,6 +125,37 @@ export const MultiplayerLobbyModal: React.FC = () => {
             placeholder="Ketik nama pemain..."
             className="w-full px-3 py-1.5 rounded-xl border-2 border-amber-300/80 bg-white font-heading font-bold text-stone-800 text-sm focus:outline-none focus:border-amber-500 shadow-inner disabled:bg-stone-100 disabled:text-stone-500"
           />
+        </div>
+
+        {/* Dompet Kelereng Pemain */}
+        <div
+          data-testid="multiplayer-wallet-card"
+          className="flex items-center justify-between bg-amber-100/70 border-2 border-amber-300/80 p-2.5 rounded-2xl shadow-inner"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-white border border-amber-400 flex items-center justify-center text-sm shadow-sm">
+              ⚪
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-heading font-black text-amber-900 leading-none">
+                DOMPET KELERENG
+              </span>
+              <span className="font-heading font-black text-sm text-stone-900 leading-tight">
+                {walletBalance} <span className="text-xs font-bold text-stone-600">Butir</span>
+              </span>
+            </div>
+          </div>
+          <button
+            data-testid="multiplayer-refill-wallet-btn"
+            onClick={() => {
+              marbleAudio.playWoodKnockSound(1.0);
+              refillBalance();
+            }}
+            className="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-500 active:translate-y-[1px] text-amber-950 font-heading font-black text-[11px] shadow-xs cursor-pointer border border-amber-500"
+            title="Isi ulang modal awal ke 50 kelereng (Testing Prototype)"
+          >
+            + Isi Ulang (50)
+          </button>
         </div>
 
         {/* Error Alert if any */}
@@ -253,41 +288,46 @@ export const MultiplayerLobbyModal: React.FC = () => {
             {activeTab === 'HOST' && (
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-xs font-heading font-black text-stone-700 mb-1.5 block">
-                    JUMLAH KELERENG TARGET DI ARENA:
-                  </label>
-                  <div role="radiogroup" aria-label="Jumlah Kelereng Target" className="grid grid-cols-4 gap-2">
-                    {[5, 9, 13, 17].map((count) => {
-                      const isSelected = selectedTargetCount === count;
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-heading font-black text-stone-700">
+                      TARUHAN KELERENG PER PEMAIN:
+                    </label>
+                    <span className="text-[11px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                      Arena: {selectedBetAmount * 2} Butir
+                    </span>
+                  </div>
+                  <div role="radiogroup" aria-label="Taruhan Kelereng Per Pemain" className="grid grid-cols-4 gap-2">
+                    {[3, 5, 7, 10].map((bet) => {
+                      const isSelected = selectedBetAmount === bet;
+                      const isAffordable = walletBalance >= bet;
                       return (
                         <button
-                          key={count}
+                          key={bet}
                           type="button"
                           role="radio"
                           aria-checked={isSelected}
+                          disabled={!isAffordable}
                           onClick={() => {
                             marbleAudio.playWoodKnockSound(1.0);
-                            setSelectedTargetCount(count);
+                            setSelectedBetAmount(bet);
                           }}
-                          className={`py-2 px-2 rounded-xl text-center border-2 transition-all cursor-pointer flex flex-col items-center justify-between gap-1 ${
-                            isSelected
+                          className={`py-2 px-1 rounded-xl text-center border-2 transition-all cursor-pointer flex flex-col items-center justify-between gap-0.5 ${
+                            !isAffordable
+                              ? 'opacity-40 bg-stone-100 border-stone-200 cursor-not-allowed'
+                              : isSelected
                               ? 'bg-amber-100 border-amber-500 border-b-[3px] border-b-amber-700 text-amber-950 font-black shadow-sm ring-2 ring-amber-400/30'
                               : 'bg-stone-50 border-stone-300 border-b-[3px] border-b-stone-400 text-stone-700 hover:bg-stone-100 font-bold active:translate-y-[1px]'
                           }`}
                         >
-                          <div className="flex items-center justify-between w-full px-1">
-                            <span className="font-heading font-black text-xs">{count} Bola</span>
-                            <div
-                              className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                isSelected ? 'border-amber-700 bg-white' : 'border-stone-400 bg-stone-200'
-                              }`}
-                            >
-                              {isSelected && <div className="w-1 h-1 rounded-full bg-amber-700" />}
-                            </div>
-                          </div>
+                          <span className="font-heading font-black text-xs">{bet} Butir</span>
+                          <span className="text-[9px] text-stone-500 font-bold">Arena: {bet * 2}</span>
                         </button>
                       );
                     })}
+                  </div>
+                  <div className="mt-1.5 p-2 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] font-medium text-stone-600 flex items-center justify-between">
+                    <span>Kamu: <strong>{selectedBetAmount}</strong> + Lawan: <strong>{selectedBetAmount}</strong></span>
+                    <span className="font-bold text-amber-900">Total Taruhan: {selectedBetAmount * 2} Bola</span>
                   </div>
                 </div>
 
@@ -336,9 +376,12 @@ export const MultiplayerLobbyModal: React.FC = () => {
                 <button
                   data-testid="multiplayer-create-room-btn"
                   onClick={handleStartHosting}
-                  className="w-full mt-2 bg-[#84cc16] hover:bg-[#94dc26] border-2 border-[#65a30d] border-b-[5px] border-b-[#3f6212] text-white font-heading font-black text-base py-3 px-6 rounded-2xl shadow-lg active:translate-y-[2px] active:border-b-[2px] transition-all cursor-pointer flex items-center justify-center text-stroke-black-heavy"
+                  disabled={walletBalance < selectedBetAmount}
+                  className="w-full mt-2 bg-[#84cc16] hover:bg-[#94dc26] border-2 border-[#65a30d] border-b-[5px] border-b-[#3f6212] text-white font-heading font-black text-base py-3 px-6 rounded-2xl shadow-lg active:translate-y-[2px] active:border-b-[2px] transition-all cursor-pointer flex items-center justify-center text-stroke-black-heavy disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  BUAT RUANG & TUNGGU LAWAN
+                  {walletBalance < selectedBetAmount
+                    ? `KELERENG TIDAK CUKUP (${walletBalance}/${selectedBetAmount})`
+                    : `PASANG TARUHAN (${selectedBetAmount}) & BUAT RUANG`}
                 </button>
               </div>
             )}
@@ -364,10 +407,10 @@ export const MultiplayerLobbyModal: React.FC = () => {
                 <button
                   data-testid="multiplayer-join-room-btn"
                   onClick={handleJoin}
-                  disabled={!inputCode.trim()}
+                  disabled={!inputCode.trim() || walletBalance < 3}
                   className="w-full mt-2 bg-[#ef4444] hover:bg-[#f87171] border-2 border-[#dc2626] border-b-[5px] border-b-[#991b1b] text-white font-heading font-black text-base py-3 px-6 rounded-2xl shadow-lg active:translate-y-[2px] active:border-b-[2px] transition-all cursor-pointer flex items-center justify-center text-stroke-black-heavy disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  GABUNG KE PERTANDINGAN
+                  {walletBalance < 3 ? 'KELERENG TIDAK CUKUP UNTUK TARUHAN' : 'GABUNG KE PERTANDINGAN'}
                 </button>
               </div>
             )}

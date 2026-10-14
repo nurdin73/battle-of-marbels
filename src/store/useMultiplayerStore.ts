@@ -10,6 +10,7 @@ import {
 } from '../types/multiplayer.types';
 import { peerService, PeerService } from '../services/peerService';
 import { useGameStore, createTargetMarblesByCount } from './useGameStore';
+import { usePlayerWalletStore } from './usePlayerWalletStore';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { ARENA_CONFIG } from '../constants/physics.constants';
 
@@ -27,7 +28,9 @@ interface MultiplayerStoreState {
   remotePlayer: PlayerInfo | null;
   currentTurnPlayerId: string | null;
   scores: { host: number; guest: number };
-  targetCount: number;
+  betAmount: number; // Taruhan per pemain (misal 5)
+  targetCount: number; // Total kelereng di lingkaran = 2 * betAmount (misal 10)
+  hasPaidOut: boolean; // Mencegah payout ganda saat pertandingan usai
   turnTimeLimitSeconds: number | null;
   pingMs: number;
   isLobbyModalOpen: boolean;
@@ -63,7 +66,7 @@ interface MultiplayerStoreState {
   openLobbyModal: () => void;
   closeLobbyModal: () => void;
   setLocalPlayerName: (name: string) => void;
-  hostRoom: (targetCount?: number, timeLimit?: number | null) => Promise<void>;
+  hostRoom: (betAmount?: number, timeLimit?: number | null) => Promise<void>;
   joinRoom: (code: string) => Promise<void>;
   leaveRoom: () => void;
   broadcastShot: (payload: ShotNetworkPayload) => void;
@@ -102,12 +105,28 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     switch (msg.type) {
       case 'MATCH_INIT': {
         // Guest receives init from Host
+        const betAmount = msg.payload.betAmount || Math.floor(msg.payload.targetCount / 2) || 5;
+        const wallet = usePlayerWalletStore.getState();
+        if (wallet.balance < betAmount) {
+          set({
+            roomStatus: 'ERROR',
+            errorMessage: `Kelerengmu tidak cukup! Butuh ${betAmount} butir untuk taruhan ini (kamu punya ${wallet.balance} butir).`,
+          });
+          peerService.destroy();
+          return;
+        }
+
+        // Deduct bet from Guest's wallet for this match
+        wallet.deductBet(betAmount);
+
         set({
+          betAmount,
           targetCount: msg.payload.targetCount,
           turnTimeLimitSeconds: msg.payload.turnTimeLimitSeconds,
           remotePlayer: msg.payload.hostPlayer,
           matchPhase: 'TOSS_PHASE',
           isMatchOver: false,
+          hasPaidOut: false,
           cameraFocusMode: 'AUTO',
           tossShotDoneP1: false,
           tossShotDoneP2: false,
@@ -135,10 +154,14 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
 
       case 'MATCH_START': {
         // Host receives guest player info -> both enter TOSS_PHASE!
+        // Deduct bet from Host's wallet for this match
+        usePlayerWalletStore.getState().deductBet(state.betAmount);
+
         set({
           remotePlayer: msg.payload.guestPlayer,
           matchPhase: 'TOSS_PHASE',
           isMatchOver: false,
+          hasPaidOut: false,
           cameraFocusMode: 'AUTO',
           tossShotDoneP1: false,
           tossShotDoneP2: false,
@@ -220,12 +243,21 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
 
       case 'REST_STATE_SYNC': {
         // Guest receives authoritative rest state from Host
+        const isMatchOverNow = Boolean(msg.payload.isMatchOver);
+        const myScore = msg.payload.scores.guest;
+
+        // Payout to Guest if match ends and not yet paid out
+        if (isMatchOverNow && !state.hasPaidOut) {
+          usePlayerWalletStore.getState().addEarnings(myScore);
+        }
+
         set({
           scores: msg.payload.scores,
           currentTurnPlayerId: msg.payload.nextTurnPlayerId,
           gacoanP1Pos: msg.payload.gacoanP1Position,
           gacoanP2Pos: msg.payload.gacoanP2Position,
-          isMatchOver: Boolean(msg.payload.isMatchOver),
+          isMatchOver: isMatchOverNow,
+          hasPaidOut: isMatchOverNow ? true : state.hasPaidOut,
         });
 
         // Reconcile marbles in game store
@@ -246,11 +278,16 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }
 
       case 'REMATCH_ACCEPT': {
+        // Deduct bet for rematch
+        const wallet = usePlayerWalletStore.getState();
+        wallet.deductBet(state.betAmount);
+
         // Reset match to Toss Phase again
         set({
           rematchRequestedBy: null,
           matchPhase: 'TOSS_PHASE',
           isMatchOver: false,
+          hasPaidOut: false,
           cameraFocusMode: 'AUTO',
           tossShotDoneP1: false,
           tossShotDoneP2: false,
@@ -272,7 +309,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     const state = get();
     if (connected) {
       set({ roomStatus: 'CONNECTED', errorMessage: null });
-      // If we are Host, send MATCH_INIT with initialTargetMarbles
+      // If we are Host, send MATCH_INIT with initialTargetMarbles and betAmount
       if (state.role === 'HOST') {
         const initialTargets = createTargetMarblesByCount(state.targetCount);
         useGameStore.setState({ targetMarbles: initialTargets });
@@ -281,6 +318,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
           payload: {
             roomId: state.roomCode,
             randomSeed: Math.floor(Math.random() * 1000000),
+            betAmount: state.betAmount,
             targetCount: state.targetCount,
             turnTimeLimitSeconds: state.turnTimeLimitSeconds,
             hostPlayer: state.localPlayer,
@@ -316,13 +354,17 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     remotePlayer: null,
     currentTurnPlayerId: null,
     scores: { host: 0, guest: 0 },
-    targetCount: 9,
+    betAmount: 5,
+    targetCount: 10,
+    hasPaidOut: false,
     turnTimeLimitSeconds: 20,
     pingMs: 0,
     isLobbyModalOpen: false,
     rematchRequestedBy: null,
+
     gacoanP1Pos: INITIAL_P1_POS,
     gacoanP2Pos: INITIAL_P2_POS,
+
     tossShotDoneP1: false,
     tossShotDoneP2: false,
     tossResult: null,
@@ -346,12 +388,22 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }));
     },
 
-    hostRoom: async (targetCount = 9, timeLimit = 20) => {
+    hostRoom: async (betAmount = 5, timeLimit = 20) => {
+      const wallet = usePlayerWalletStore.getState();
+      if (wallet.balance < betAmount) {
+        set({
+          errorMessage: `Kelerengmu tidak cukup (${wallet.balance} butir) untuk memasang taruhan ${betAmount} butir!`,
+        });
+        return;
+      }
+
       const code = PeerService.generateRoomCode();
       const hostPlayer: PlayerInfo = {
         ...DEFAULT_LOCAL_HOST,
         name: get().localPlayer.name || 'Jawara Biru',
       };
+
+      const targetCount = betAmount * 2; // Setiap pemain menyetor betAmount, total di arena = 2x taruhan
 
       set({
         isMultiplayerActive: true,
@@ -359,7 +411,9 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         matchPhase: 'LOBBY',
         roomCode: code,
         role: 'HOST',
+        betAmount,
         targetCount,
+        hasPaidOut: false,
         turnTimeLimitSeconds: timeLimit,
         localPlayer: hostPlayer,
         remotePlayer: null,
@@ -406,6 +460,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         gacoanP1Pos: INITIAL_P1_POS,
         gacoanP2Pos: INITIAL_P2_POS,
         isMatchOver: false,
+        hasPaidOut: false,
         cameraFocusMode: 'AUTO',
       });
 
@@ -434,6 +489,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         tossResult: null,
         tossBannerMessage: null,
         isMatchOver: false,
+        hasPaidOut: false,
         cameraFocusMode: 'AUTO',
       });
       useGameStore.getState().goToMainMenu();
@@ -473,12 +529,22 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     },
 
     broadcastRestState: (payload: RestStatePayload) => {
+      const state = get();
+      const isMatchOverNow = Boolean(payload.isMatchOver);
+      const myScore = state.role === 'HOST' ? payload.scores.host : payload.scores.guest;
+
+      // Payout to Host if match ends and not yet paid out
+      if (isMatchOverNow && !state.hasPaidOut) {
+        usePlayerWalletStore.getState().addEarnings(myScore);
+      }
+
       set({
         scores: payload.scores,
         currentTurnPlayerId: payload.nextTurnPlayerId,
         gacoanP1Pos: payload.gacoanP1Position,
         gacoanP2Pos: payload.gacoanP2Position,
-        isMatchOver: Boolean(payload.isMatchOver),
+        isMatchOver: isMatchOverNow,
+        hasPaidOut: isMatchOverNow ? true : state.hasPaidOut,
       });
       peerService.sendMessage({
         type: 'REST_STATE_SYNC',
@@ -490,7 +556,13 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     updateGacoanP2Pos: (pos) => set({ gacoanP2Pos: pos }),
 
     requestRematch: () => {
-      const localId = get().localPlayer.id;
+      const state = get();
+      const wallet = usePlayerWalletStore.getState();
+      if (wallet.balance < state.betAmount) {
+        alert(`Kelerengmu tidak cukup (${wallet.balance} butir) untuk taruhan ulang ${state.betAmount} butir!`);
+        return;
+      }
+      const localId = state.localPlayer.id;
       peerService.sendMessage({
         type: 'REMATCH_REQUEST',
         senderId: localId,
@@ -498,6 +570,13 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     },
 
     acceptRematch: () => {
+      const state = get();
+      const wallet = usePlayerWalletStore.getState();
+      if (wallet.balance < state.betAmount) {
+        alert(`Kelerengmu tidak cukup (${wallet.balance} butir) untuk taruhan ulang ${state.betAmount} butir!`);
+        return;
+      }
+      wallet.deductBet(state.betAmount);
       peerService.sendMessage({
         type: 'REMATCH_ACCEPT',
       });
@@ -505,6 +584,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         rematchRequestedBy: null,
         matchPhase: 'TOSS_PHASE',
         isMatchOver: false,
+        hasPaidOut: false,
         cameraFocusMode: 'AUTO',
         tossShotDoneP1: false,
         tossShotDoneP2: false,
@@ -515,7 +595,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         gacoanP2Pos: INITIAL_P2_POS,
         currentTurnPlayerId: null,
       });
-      useGameStore.getState().startMatchWithMarbleCount(get().targetCount, get().turnTimeLimitSeconds);
+      useGameStore.getState().startMatchWithMarbleCount(state.targetCount, state.turnTimeLimitSeconds);
     },
 
     setRemoteShotListener: (cb) => set({ onRemoteShotReceived: cb }),
