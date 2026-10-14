@@ -1,17 +1,43 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
+import { useTexture } from '@react-three/drei';
 import { RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { MarbleEntity } from '../../types/physics.types';
 import { TARGET_MARBLE_PHYSICS, ARENA_CONFIG, SCENE_PERIMETER_BOUNDS } from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
+export const TARGET_MARBLE_TEXTURE_URLS = [
+  '/assets/textures/marble-green-yellow.png',
+  '/assets/textures/marble-orange-cream.png',
+];
+
+TARGET_MARBLE_TEXTURE_URLS.forEach((url) => {
+  useTexture.preload(url);
+});
+
 interface TargetMarbleProps {
   marble: MarbleEntity;
 }
 
 export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
+  const targetTextures = useTexture(TARGET_MARBLE_TEXTURE_URLS);
+
+  useEffect(() => {
+    targetTextures.forEach((tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+    });
+  }, [targetTextures]);
+
+  const selectedTexture = useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < marble.id.length; i++) {
+      hash = (hash * 31 + marble.id.charCodeAt(i)) >>> 0;
+    }
+    return targetTextures[hash % targetTextures.length];
+  }, [marble.id, targetTextures]);
+
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const groupRef = useRef<THREE.Group>(null);
   const isOutsideRef = useRef<boolean>(false);
@@ -178,19 +204,6 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
     }
   };
 
-  const swirlColor = marble.swirlColor || '#ef4444';
-  const swirlColorObj = useMemo(() => new THREE.Color(swirlColor), [swirlColor]);
-
-  // Complementary accent color for dual cat-eye swirl vane
-  const secondarySwirlHex = useMemo(() => {
-    const c = new THREE.Color(swirlColor);
-    const hsl = { h: 0, s: 0, l: 0 };
-    c.getHSL(hsl);
-    hsl.h = (hsl.h + 0.12) % 1.0;
-    hsl.l = Math.min(0.82, hsl.l + 0.15);
-    return `#${new THREE.Color().setHSL(hsl.h, hsl.s, hsl.l).getHexString()}`;
-  }, [swirlColor]);
-
   return (
     <RigidBody
       ref={rigidBodyRef}
@@ -204,49 +217,17 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
       onCollisionEnter={handleCollision}
     >
       <group ref={groupRef}>
-        {/* Outer translucent optical glass shell */}
+        {/* Polished Glass Target Marble with Green-Yellow / Orange-Cream Texture */}
         <mesh castShadow receiveShadow>
-          <sphereGeometry args={[marble.radius, 36, 36]} />
+          <sphereGeometry args={[marble.radius, 40, 40]} />
           <meshPhysicalMaterial
-            roughness={0.04}
-            transmission={0.92}
-            thickness={0.5}
-            ior={1.52}
-            reflectivity={0.92}
+            map={selectedTexture}
+            roughness={0.06}
+            metalness={0.02}
             clearcoat={1.0}
             clearcoatRoughness={0.04}
-            attenuationColor={swirlColorObj}
-            attenuationDistance={0.35}
-          />
-        </mesh>
-
-        {/* Primary Indonesian Cat-Eye Vane (Kelopak Belimbing Utama) */}
-        <mesh rotation={[0.45, 0.65, 0.2]}>
-          <torusGeometry args={[marble.radius * 0.5, marble.radius * 0.18, 16, 28]} />
-          <meshStandardMaterial
-            color={swirlColor}
-            roughness={0.25}
-            metalness={0.15}
-          />
-        </mesh>
-
-        {/* Secondary Twisted Accent Vane (Kelopak Sayap Kedua) */}
-        <mesh rotation={[-0.45, -0.65, 0.85]}>
-          <torusGeometry args={[marble.radius * 0.44, marble.radius * 0.14, 16, 24]} />
-          <meshStandardMaterial
-            color={secondarySwirlHex}
-            roughness={0.28}
-            metalness={0.12}
-          />
-        </mesh>
-
-        {/* Central Core Molten Glass Bead */}
-        <mesh>
-          <sphereGeometry args={[marble.radius * 0.18, 12, 12]} />
-          <meshStandardMaterial
-            color={swirlColor}
-            roughness={0.2}
-            metalness={0.2}
+            reflectivity={0.94}
+            ior={1.52}
           />
         </mesh>
       </group>
