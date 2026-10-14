@@ -28,7 +28,7 @@ export const MARBLE_PHYSICAL_CONFIGS: Record<MarbleMaterialType, MarblePhysicalP
 };
 
 export const TARGET_MARBLE_PHYSICS: MarblePhysicalProps = {
-  mass: 0.015,
+  mass: 0.013,
   restitution: 0.72,
   frictionStatic: 0.30,
   frictionDynamic: 0.22,
@@ -40,7 +40,9 @@ export const ARENA_CONFIG = {
   ringRadius: 1.8,
   groundSizeX: 12.0,
   groundSizeZ: 20.0,
-  marbleRadius: 0.075,
+  marbleRadius: 0.082, // Default / Gacoan radius
+  gacoanMarbleRadius: 0.082, // Kelereng gacoan andalan pemain (lebih besar & berbobot)
+  targetMarbleRadius: 0.065, // Kelereng taruhan lingkaran (proporsional khas pot)
   maxDragDistance: 0.75,
   forceExponent: 1.35,
   minImpulse: 0.0035,
@@ -53,7 +55,7 @@ export const GAMEPLAY_CONFIG = {
   turnTimeLimitSeconds: 20,
   parFlicks: 5,
   initialTargetCount: 9,
-  foulResetPosition: [0, 0.075, 2.3] as [number, number, number],
+  foulResetPosition: [0, 0.082, 2.3] as [number, number, number],
 };
 
 export const SCENE_PERIMETER_BOUNDS = {
@@ -64,14 +66,17 @@ export const SCENE_PERIMETER_BOUNDS = {
   maxSimulationWatchdogSeconds: 7.0,
 };
 
-export const DEFAULT_SWIRL_COLORS = [
-  '#ef4444', // Red
-  '#3b82f6', // Blue
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
-  '#8b5cf6', // Violet
-  '#ec4899', // Pink
-  '#06b6d4', // Cyan
-  '#f97316', // Orange
-  '#84cc16', // Lime
+// Exclusive Target/Wager Marble Swirl Colors (bebas dari Biru Host #3b82f6 dan Merah Guest #ef4444)
+export const TARGET_SWIRL_COLORS = [
+  '#10b981', // Zamrud Hijau
+  '#f59e0b', // Amber / Madu Emas
+  '#8b5cf6', // Pualam Ungu
+  '#06b6d4', // Pirus Cyan
+  '#ea580c', // Oranye Jeruk
+  '#84cc16', // Belimbing Lime
+  '#ec4899', // Mutiara Pink
+  '#eab308', // Sitrin Kuning
 ];
+
+export const DEFAULT_SWIRL_COLORS = TARGET_SWIRL_COLORS;
+

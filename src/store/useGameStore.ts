@@ -7,7 +7,7 @@ import {
   ActiveFlightData,
   TurnEvaluationOutcome,
 } from '../types/physics.types';
-import { ARENA_CONFIG, DEFAULT_SWIRL_COLORS, GAMEPLAY_CONFIG } from '../constants/physics.constants';
+import { ARENA_CONFIG, TARGET_SWIRL_COLORS, GAMEPLAY_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { useCardStore } from './useCardStore';
 
@@ -89,7 +89,7 @@ interface GameStoreState {
  */
 export function createTargetMarblesByCount(count: number): MarbleEntity[] {
   const clampedCount = Math.max(3, Math.min(25, count));
-  const r = ARENA_CONFIG.marbleRadius;
+  const r = ARENA_CONFIG.targetMarbleRadius;
   const positions: [number, number, number][] = [];
 
   // Center marble
@@ -120,7 +120,7 @@ export function createTargetMarblesByCount(count: number): MarbleEntity[] {
     materialType: 'GLASS_CLASSIC',
     initialPosition: pos,
     radius: r,
-    swirlColor: DEFAULT_SWIRL_COLORS[idx % DEFAULT_SWIRL_COLORS.length],
+    swirlColor: TARGET_SWIRL_COLORS[idx % TARGET_SWIRL_COLORS.length],
   }));
 }
 

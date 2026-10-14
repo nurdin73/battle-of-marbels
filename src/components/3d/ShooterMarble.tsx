@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
 import {
   ARENA_CONFIG,
@@ -16,6 +17,8 @@ const INITIAL_SHOOTER_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetP
 
 export const ShooterMarble: React.FC = () => {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
+  const badgeRef = useRef<THREE.Group>(null);
+  const groundAuraRef = useRef<THREE.Group>(null);
   const stillFrameCountRef = useRef<number>(0);
   const simulatingFrameCountRef = useRef<number>(0);
   const flightProgressRef = useRef<number>(0);
@@ -101,6 +104,12 @@ export const ShooterMarble: React.FC = () => {
 
       rigidBodyRef.current.setTranslation({ x: currentX, y: currentY, z: currentZ }, true);
       updateGacoanPos([currentX, currentY, currentZ]);
+      if (badgeRef.current) {
+        badgeRef.current.position.set(currentX, currentY + gacoanR + 0.14, currentZ);
+      }
+      if (groundAuraRef.current) {
+        groundAuraRef.current.position.set(currentX, 0.002, currentZ);
+      }
 
       if (t >= 1.0) {
         // Impact & Physics Handover!
@@ -142,6 +151,12 @@ export const ShooterMarble: React.FC = () => {
 
     const translation = rigidBodyRef.current.translation();
     updateGacoanPos([translation.x, translation.y, translation.z]);
+    if (badgeRef.current) {
+      badgeRef.current.position.set(translation.x, translation.y + gacoanR + 0.14, translation.z);
+    }
+    if (groundAuraRef.current) {
+      groundAuraRef.current.position.set(translation.x, 0.002, translation.z);
+    }
 
     // 1. Detect if marble is outside the perimeter walls or scene container bounds
     const isOutOfScene =
@@ -274,13 +289,15 @@ export const ShooterMarble: React.FC = () => {
     }
   };
 
+  const gacoanR = ARENA_CONFIG.gacoanMarbleRadius;
+
   const renderMaterial = () => {
     if (gacoanMaterial === 'GLASS_CLASSIC') {
       return (
         <group>
           {/* Optical Clear Translucent Outer Glass Shell */}
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+            <sphereGeometry args={[gacoanR, 36, 36]} />
             <meshPhysicalMaterial
               roughness={0.03}
               transmission={0.94}
@@ -298,8 +315,8 @@ export const ShooterMarble: React.FC = () => {
           <mesh rotation={[0.48, 0.35, 0.15]}>
             <torusGeometry
               args={[
-                ARENA_CONFIG.marbleRadius * 0.52,
-                ARENA_CONFIG.marbleRadius * 0.18,
+                gacoanR * 0.52,
+                gacoanR * 0.18,
                 16,
                 28,
               ]}
@@ -311,8 +328,8 @@ export const ShooterMarble: React.FC = () => {
           <mesh rotation={[-0.45, -0.55, 0.9]}>
             <torusGeometry
               args={[
-                ARENA_CONFIG.marbleRadius * 0.46,
-                ARENA_CONFIG.marbleRadius * 0.14,
+                gacoanR * 0.46,
+                gacoanR * 0.14,
                 16,
                 24,
               ]}
@@ -322,7 +339,7 @@ export const ShooterMarble: React.FC = () => {
 
           {/* Central Molten Amber Nucleus */}
           <mesh>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 0.18, 12, 12]} />
+            <sphereGeometry args={[gacoanR * 0.18, 12, 12]} />
             <meshStandardMaterial color="#f59e0b" roughness={0.2} metalness={0.3} />
           </mesh>
         </group>
@@ -333,15 +350,15 @@ export const ShooterMarble: React.FC = () => {
       return (
         <group>
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+            <sphereGeometry args={[gacoanR, 36, 36]} />
             <meshStandardMaterial color="#e2e8f0" roughness={0.38} metalness={0.05} />
           </mesh>
           {/* Subtle natural stone sedimentary banding */}
           <mesh rotation={[0.6, 0.4, 0]}>
             <torusGeometry
               args={[
-                ARENA_CONFIG.marbleRadius * 0.92,
-                ARENA_CONFIG.marbleRadius * 0.08,
+                gacoanR * 0.92,
+                gacoanR * 0.08,
                 12,
                 32,
               ]}
@@ -355,45 +372,115 @@ export const ShooterMarble: React.FC = () => {
     // BEARING_STEEL: Polished mirror steel ball
     return (
       <mesh castShadow receiveShadow>
-        <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 36, 36]} />
+        <sphereGeometry args={[gacoanR, 36, 36]} />
         <meshStandardMaterial color="#cbd5e1" roughness={0.06} metalness={0.98} />
       </mesh>
     );
   };
 
   return (
-    <RigidBody
-      ref={rigidBodyRef}
-      colliders={false}
-      ccd={true}
-      position={INITIAL_SHOOTER_POS}
-      mass={physicalConfig.mass}
-      restitution={physicalConfig.restitution}
-      friction={physicalConfig.frictionDynamic}
-      linearDamping={physicalConfig.linearDamping}
-      angularDamping={physicalConfig.angularDamping}
-      onCollisionEnter={handleCollision}
-    >
-      {/* Explicit Rapier physical ball collider: strictly matches real marble radius */}
-      <BallCollider args={[ARENA_CONFIG.marbleRadius]} />
+    <>
+      <RigidBody
+        ref={rigidBodyRef}
+        colliders={false}
+        ccd={true}
+        position={INITIAL_SHOOTER_POS}
+        mass={physicalConfig.mass}
+        restitution={physicalConfig.restitution}
+        friction={physicalConfig.frictionDynamic}
+        linearDamping={physicalConfig.linearDamping}
+        angularDamping={physicalConfig.angularDamping}
+        onCollisionEnter={handleCollision}
+      >
+        {/* Explicit Rapier physical ball collider: strictly matches real gacoan marble radius */}
+        <BallCollider args={[gacoanR]} />
 
-      <group onPointerDown={onPointerDown}>
-        {/* Generous invisible hit target for effortless click & touch capture (has NO physics collision) */}
-        <mesh>
-          <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 2.5, 16, 16]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
-
-        {renderMaterial()}
-
-        {/* Pulsing selection ring flush on the ground when IDLE */}
-        {aimingState === 'IDLE' && (
-          <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[ARENA_CONFIG.marbleRadius * 1.3, ARENA_CONFIG.marbleRadius * 1.55, 32]} />
-            <meshBasicMaterial color="#38bdf8" transparent opacity={0.6} />
+        <group onPointerDown={onPointerDown}>
+          {/* Generous invisible hit target for effortless click & touch capture (has NO physics collision) */}
+          <mesh>
+            <sphereGeometry args={[gacoanR * 2.5, 16, 16]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
-        )}
+
+          {renderMaterial()}
+        </group>
+      </RigidBody>
+
+      {/* Decoupled Ground Aura Disc (Flat on dirt floor, never rolls) */}
+      <group
+        ref={groundAuraRef}
+        position={[INITIAL_SHOOTER_POS[0], 0.002, INITIAL_SHOOTER_POS[2]]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <mesh>
+          <ringGeometry args={[gacoanR * 1.15, gacoanR * 1.65, 32]} />
+          <meshBasicMaterial
+            color="#38bdf8"
+            transparent
+            opacity={aimingState === 'IDLE' ? 0.85 : 0.35}
+          />
+        </mesh>
+        <mesh position={[0, 0, -0.001]}>
+          <circleGeometry args={[gacoanR * 1.65, 32]} />
+          <meshBasicMaterial
+            color="#0284c7"
+            transparent
+            opacity={aimingState === 'IDLE' ? 0.28 : 0.08}
+          />
+        </mesh>
       </group>
-    </RigidBody>
+
+      {/* Decoupled Floating 3D Identity Badge (Upright above marble with inverted triangle pointer) */}
+      <group
+        ref={badgeRef}
+        position={[INITIAL_SHOOTER_POS[0], INITIAL_SHOOTER_POS[1] + gacoanR + 0.14, INITIAL_SHOOTER_POS[2]]}
+      >
+        <Html
+          center
+          distanceFactor={5}
+          className="pointer-events-none select-none"
+        >
+          <div
+            data-testid="badge-gacoan-solo"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '2px',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          >
+            {/* Pure Player Name Text (No Card Background) */}
+            <span
+              style={{
+                color: '#38bdf8',
+                fontSize: '9px',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
+                lineHeight: 1,
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.85)',
+              }}
+            >
+              GACOAN KAMU {aimingState === 'IDLE' ? '⚡' : ''}
+            </span>
+
+            {/* Inverted Triangle Pointer Chevron */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: '3.5px solid transparent',
+                borderRight: '3.5px solid transparent',
+                borderTop: `5px solid ${aimingState === 'IDLE' ? '#38bdf8' : 'rgba(56, 189, 248, 0.85)'}`,
+                filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9))',
+              }}
+            />
+          </div>
+        </Html>
+      </group>
+    </>
   );
 };

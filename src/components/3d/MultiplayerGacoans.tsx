@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { ARENA_CONFIG, MARBLE_PHYSICAL_CONFIGS, SCENE_PERIMETER_BOUNDS } from '../../constants/physics.constants';
 import { useMultiplayerStore, INITIAL_P1_POS, INITIAL_P2_POS } from '../../store/useMultiplayerStore';
@@ -11,6 +12,10 @@ import { marbleAudio } from '../../utils/soundSynth.utils';
 export const MultiplayerGacoans: React.FC = () => {
   const p1RigidBodyRef = useRef<RapierRigidBody>(null);
   const p2RigidBodyRef = useRef<RapierRigidBody>(null);
+  const p1BadgeRef = useRef<THREE.Group>(null);
+  const p1GroundAuraRef = useRef<THREE.Group>(null);
+  const p2BadgeRef = useRef<THREE.Group>(null);
+  const p2GroundAuraRef = useRef<THREE.Group>(null);
 
   const role = useMultiplayerStore((s) => s.role);
   const localPlayer = useMultiplayerStore((s) => s.localPlayer);
@@ -131,6 +136,29 @@ export const MultiplayerGacoans: React.FC = () => {
 
   // Frame monitoring for ball resting & turn transition
   useFrame((_, delta) => {
+    const gacoanR = ARENA_CONFIG.gacoanMarbleRadius;
+
+    // 0. Synchronize decoupled badge and ground aura positions (strictly isolates them from marble 3D rotation)
+    const transP1 = p1RigidBodyRef.current?.translation();
+    if (transP1) {
+      if (p1BadgeRef.current) {
+        p1BadgeRef.current.position.set(transP1.x, transP1.y + gacoanR + 0.14, transP1.z);
+      }
+      if (p1GroundAuraRef.current) {
+        p1GroundAuraRef.current.position.set(transP1.x, 0.002, transP1.z);
+      }
+    }
+
+    const transP2 = p2RigidBodyRef.current?.translation();
+    if (transP2) {
+      if (p2BadgeRef.current) {
+        p2BadgeRef.current.position.set(transP2.x, transP2.y + gacoanR + 0.14, transP2.z);
+      }
+      if (p2GroundAuraRef.current) {
+        p2GroundAuraRef.current.position.set(transP2.x, 0.002, transP2.z);
+      }
+    }
+
     // 1. Real-time gacoan coordinate synchronization to game store for CameraController tracking
     const localRigidBody = isHost ? p1RigidBodyRef.current : p2RigidBodyRef.current;
     const opponentRigidBody = isHost ? p2RigidBodyRef.current : p1RigidBodyRef.current;
@@ -410,6 +438,26 @@ export const MultiplayerGacoans: React.FC = () => {
     }
   };
 
+  const gacoanR = ARENA_CONFIG.gacoanMarbleRadius;
+
+  const isP1Turn =
+    matchPhase === 'TOSS_PHASE'
+      ? !tossShotDoneP1
+      : currentTurnPlayerId === (isHost ? localPlayer.id : remotePlayer?.id);
+
+  const isP2Turn =
+    matchPhase === 'TOSS_PHASE'
+      ? !tossShotDoneP2
+      : currentTurnPlayerId === (!isHost ? localPlayer.id : remotePlayer?.id);
+
+  const p1DisplayName = isHost
+    ? `${localPlayer.name} (Kamu)`
+    : `${remotePlayer?.name || 'Tuan Rumah'} (Tuan Rumah)`;
+
+  const p2DisplayName = !isHost
+    ? `${localPlayer.name} (Kamu)`
+    : `${remotePlayer?.name || 'Tamu'} (Lawan)`;
+
   return (
     <>
       {/* ======================================================== */}
@@ -418,25 +466,25 @@ export const MultiplayerGacoans: React.FC = () => {
       <RigidBody
         ref={p1RigidBodyRef}
         colliders={false}
-        position={[-0.25, ARENA_CONFIG.marbleRadius, 2.3]}
+        position={[-0.25, gacoanR, 2.3]}
         mass={physicalConfig.mass}
         restitution={physicalConfig.restitution}
         friction={physicalConfig.frictionDynamic}
         linearDamping={physicalConfig.linearDamping}
         angularDamping={physicalConfig.angularDamping}
       >
-        <BallCollider args={[ARENA_CONFIG.marbleRadius]} />
+        <BallCollider args={[gacoanR]} />
 
         <group onPointerDown={isHost ? handleGacoanPointerDown : undefined}>
           {/* Click target mesh */}
           <mesh>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 2.5, 16, 16]} />
+            <sphereGeometry args={[gacoanR * 2.5, 16, 16]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
 
-          {/* Translucent Glass Sphere */}
+          {/* Translucent Glass Sphere (Gacoan Blue) */}
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 32, 32]} />
+            <sphereGeometry args={[gacoanR, 32, 32]} />
             <meshPhysicalMaterial
               roughness={0.04}
               transmission={0.93}
@@ -450,31 +498,13 @@ export const MultiplayerGacoans: React.FC = () => {
 
           {/* Blue Core Swirls */}
           <mesh rotation={[0.48, 0.35, 0.15]}>
-            <torusGeometry args={[ARENA_CONFIG.marbleRadius * 0.52, ARENA_CONFIG.marbleRadius * 0.18, 16, 24]} />
+            <torusGeometry args={[gacoanR * 0.52, gacoanR * 0.18, 16, 24]} />
             <meshStandardMaterial color="#2563eb" roughness={0.2} metalness={0.2} />
           </mesh>
           <mesh rotation={[-0.45, -0.55, 0.9]}>
-            <torusGeometry args={[ARENA_CONFIG.marbleRadius * 0.46, ARENA_CONFIG.marbleRadius * 0.14, 16, 24]} />
+            <torusGeometry args={[gacoanR * 0.46, gacoanR * 0.14, 16, 24]} />
             <meshStandardMaterial color="#38bdf8" roughness={0.25} metalness={0.15} />
           </mesh>
-
-          {/* Active Player Ring Highlight */}
-          {aimingState === 'IDLE' && (
-            <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[ARENA_CONFIG.marbleRadius * 1.3, ARENA_CONFIG.marbleRadius * 1.6, 32]} />
-              <meshBasicMaterial
-                color={
-                  matchPhase === 'TOSS_PHASE'
-                    ? (!tossShotDoneP1 ? '#3b82f6' : '#94a3b8')
-                    : currentTurnPlayerId === (isHost ? localPlayer.id : remotePlayer?.id)
-                    ? '#3b82f6'
-                    : '#94a3b8'
-                }
-                transparent
-                opacity={0.8}
-              />
-            </mesh>
-          )}
         </group>
       </RigidBody>
 
@@ -484,25 +514,25 @@ export const MultiplayerGacoans: React.FC = () => {
       <RigidBody
         ref={p2RigidBodyRef}
         colliders={false}
-        position={[0.25, ARENA_CONFIG.marbleRadius, 2.3]}
+        position={[0.25, gacoanR, 2.3]}
         mass={physicalConfig.mass}
         restitution={physicalConfig.restitution}
         friction={physicalConfig.frictionDynamic}
         linearDamping={physicalConfig.linearDamping}
         angularDamping={physicalConfig.angularDamping}
       >
-        <BallCollider args={[ARENA_CONFIG.marbleRadius]} />
+        <BallCollider args={[gacoanR]} />
 
         <group onPointerDown={!isHost ? handleGacoanPointerDown : undefined}>
           {/* Click target mesh */}
           <mesh>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius * 2.5, 16, 16]} />
+            <sphereGeometry args={[gacoanR * 2.5, 16, 16]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
 
-          {/* Translucent Glass Sphere */}
+          {/* Translucent Glass Sphere (Gacoan Red) */}
           <mesh castShadow receiveShadow>
-            <sphereGeometry args={[ARENA_CONFIG.marbleRadius, 32, 32]} />
+            <sphereGeometry args={[gacoanR, 32, 32]} />
             <meshPhysicalMaterial
               roughness={0.04}
               transmission={0.93}
@@ -516,33 +546,158 @@ export const MultiplayerGacoans: React.FC = () => {
 
           {/* Crimson Red Core Swirls */}
           <mesh rotation={[0.48, 0.35, 0.15]}>
-            <torusGeometry args={[ARENA_CONFIG.marbleRadius * 0.52, ARENA_CONFIG.marbleRadius * 0.18, 16, 24]} />
+            <torusGeometry args={[gacoanR * 0.52, gacoanR * 0.18, 16, 24]} />
             <meshStandardMaterial color="#dc2626" roughness={0.2} metalness={0.2} />
           </mesh>
           <mesh rotation={[-0.45, -0.55, 0.9]}>
-            <torusGeometry args={[ARENA_CONFIG.marbleRadius * 0.46, ARENA_CONFIG.marbleRadius * 0.14, 16, 24]} />
+            <torusGeometry args={[gacoanR * 0.46, gacoanR * 0.14, 16, 24]} />
             <meshStandardMaterial color="#f87171" roughness={0.25} metalness={0.15} />
           </mesh>
-
-          {/* Active Player Ring Highlight */}
-          {aimingState === 'IDLE' && (
-            <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[ARENA_CONFIG.marbleRadius * 1.3, ARENA_CONFIG.marbleRadius * 1.6, 32]} />
-              <meshBasicMaterial
-                color={
-                  matchPhase === 'TOSS_PHASE'
-                    ? (!tossShotDoneP2 ? '#ef4444' : '#94a3b8')
-                    : currentTurnPlayerId === (!isHost ? localPlayer.id : remotePlayer?.id)
-                    ? '#ef4444'
-                    : '#94a3b8'
-                }
-                transparent
-                opacity={0.8}
-              />
-            </mesh>
-          )}
         </group>
       </RigidBody>
+
+      {/* ======================================================== */}
+      {/* ORIENTATION-STABILIZED OVERLAYS (GROUND AURAS & 3D BADGES) */}
+      {/* Strictly decoupled from rolling physics so they never roll */}
+      {/* ======================================================== */}
+
+      {/* P1 Ground Aura Disc (Flat on dirt floor) */}
+      <group ref={p1GroundAuraRef} position={[-0.25, 0.002, 2.3]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh>
+          <ringGeometry args={[gacoanR * 1.15, gacoanR * 1.65, 32]} />
+          <meshBasicMaterial
+            color="#38bdf8"
+            transparent
+            opacity={isP1Turn ? 0.85 : 0.35}
+          />
+        </mesh>
+        <mesh position={[0, 0, -0.001]}>
+          <circleGeometry args={[gacoanR * 1.65, 32]} />
+          <meshBasicMaterial
+            color="#0284c7"
+            transparent
+            opacity={isP1Turn ? 0.28 : 0.08}
+          />
+        </mesh>
+      </group>
+
+      {/* P1 Floating 3D Identity Badge (Upright above marble with inverted triangle pointer) */}
+      <group ref={p1BadgeRef} position={[-0.25, gacoanR * 2 + 0.14, 2.3]}>
+        <Html
+          center
+          distanceFactor={5}
+          className="pointer-events-none select-none"
+        >
+          <div
+            data-testid="badge-gacoan-p1"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '2px',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          >
+            {/* Pure Player Name Text (No Card Background) */}
+            <span
+              style={{
+                color: '#38bdf8',
+                fontSize: '9px',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
+                lineHeight: 1,
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.85)',
+              }}
+            >
+              {p1DisplayName}
+            </span>
+
+            {/* Inverted Triangle Pointer Chevron */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: '3.5px solid transparent',
+                borderRight: '3.5px solid transparent',
+                borderTop: `5px solid ${isP1Turn ? '#38bdf8' : 'rgba(56, 189, 248, 0.85)'}`,
+                filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9))',
+              }}
+            />
+          </div>
+        </Html>
+      </group>
+
+      {/* P2 Ground Aura Disc (Flat on dirt floor) */}
+      <group ref={p2GroundAuraRef} position={[0.25, 0.002, 2.3]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh>
+          <ringGeometry args={[gacoanR * 1.15, gacoanR * 1.65, 32]} />
+          <meshBasicMaterial
+            color="#f87171"
+            transparent
+            opacity={isP2Turn ? 0.85 : 0.35}
+          />
+        </mesh>
+        <mesh position={[0, 0, -0.001]}>
+          <circleGeometry args={[gacoanR * 1.65, 32]} />
+          <meshBasicMaterial
+            color="#b91c1c"
+            transparent
+            opacity={isP2Turn ? 0.28 : 0.08}
+          />
+        </mesh>
+      </group>
+
+      {/* P2 Floating 3D Identity Badge (Upright above marble with inverted triangle pointer) */}
+      <group ref={p2BadgeRef} position={[0.25, gacoanR * 2 + 0.14, 2.3]}>
+        <Html
+          center
+          distanceFactor={5}
+          className="pointer-events-none select-none"
+        >
+          <div
+            data-testid="badge-gacoan-p2"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '2px',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          >
+            {/* Pure Player Name Text (No Card Background) */}
+            <span
+              style={{
+                color: '#f87171',
+                fontSize: '9px',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
+                lineHeight: 1,
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.85)',
+              }}
+            >
+              {p2DisplayName} {isP2Turn ? '⚡' : ''}
+            </span>
+
+            {/* Inverted Triangle Pointer Chevron */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: '3.5px solid transparent',
+                borderRight: '3.5px solid transparent',
+                borderTop: `5px solid ${isP2Turn ? '#f87171' : 'rgba(248, 113, 113, 0.85)'}`,
+                filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9))',
+              }}
+            />
+          </div>
+        </Html>
+      </group>
     </>
   );
 };
