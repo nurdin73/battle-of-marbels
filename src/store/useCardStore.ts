@@ -25,7 +25,7 @@ interface CardStoreState {
 export const useCardStore = create<CardStoreState>((set, get) => ({
   chalkEnergy: INITIAL_CHALK_ENERGY,
   maxChalkEnergy: MAX_CHALK_ENERGY,
-  handCards: cardService.drawHand(3),
+  handCards: cardService.drawHand(4),
   activeCardId: null,
   isDeckExpanded: true,
 
@@ -93,7 +93,7 @@ export const useCardStore = create<CardStoreState>((set, get) => ({
 
   drawNewHand: () => {
     set({
-      handCards: cardService.drawHand(3),
+      handCards: cardService.drawHand(4),
       activeCardId: null,
     });
   },
@@ -101,7 +101,7 @@ export const useCardStore = create<CardStoreState>((set, get) => ({
   resetCardStore: () => {
     set({
       chalkEnergy: INITIAL_CHALK_ENERGY,
-      handCards: cardService.drawHand(3),
+      handCards: cardService.drawHand(4),
       activeCardId: null,
     });
   },

@@ -1,208 +1,122 @@
 import React from 'react';
 import { useCardStore, MAX_CHALK_ENERGY } from '../../store/useCardStore';
 import { useGameStore } from '../../store/useGameStore';
-import { Sparkles, X, ChevronUp, ChevronDown, Zap, Shield, Compass, Sliders } from 'lucide-react';
-import { CardRarity, CardCategory } from '../../types/card.types';
+import { X, Sparkles } from 'lucide-react';
 
 export const CardDeckOverlay: React.FC = () => {
   const chalkEnergy = useCardStore((s) => s.chalkEnergy);
   const handCards = useCardStore((s) => s.handCards);
   const activeCardId = useCardStore((s) => s.activeCardId);
-  const isDeckExpanded = useCardStore((s) => s.isDeckExpanded);
   const selectCard = useCardStore((s) => s.selectCard);
   const deselectCard = useCardStore((s) => s.deselectCard);
-  const toggleDeckExpanded = useCardStore((s) => s.toggleDeckExpanded);
 
   const aimingState = useGameStore((s) => s.aimingState);
-  const isInteracting = aimingState === 'AIMING' || aimingState === 'CHARGING' || aimingState === 'AIRBORNE' || aimingState === 'SIMULATING';
-
-  const getRarityBadge = (rarity: CardRarity) => {
-    switch (rarity) {
-      case 'EPIC':
-        return 'border-amber-300 bg-amber-100 text-amber-900 font-bold';
-      case 'RARE':
-        return 'border-purple-200 bg-purple-100 text-purple-900 font-bold';
-      case 'UNCOMMON':
-        return 'border-emerald-200 bg-emerald-100 text-emerald-900 font-bold';
-      default:
-        return 'border-stone-200 bg-stone-100 text-stone-700 font-bold';
-    }
-  };
-
-  const getRarityLabel = (rarity: CardRarity) => {
-    switch (rarity) {
-      case 'EPIC':
-        return 'Legenda';
-      case 'RARE':
-        return 'Hebat';
-      case 'UNCOMMON':
-        return 'Apik';
-      default:
-        return 'Biasa';
-    }
-  };
-
-  const getCategoryIcon = (category: CardCategory) => {
-    switch (category) {
-      case 'AIM':
-        return <Compass className="w-3.5 h-3.5 text-sky-700" />;
-      case 'LAUNCH':
-        return <Zap className="w-3.5 h-3.5 text-orange-600" />;
-      case 'LOADOUT':
-        return <Sliders className="w-3.5 h-3.5 text-purple-700" />;
-      default:
-        return <Shield className="w-3.5 h-3.5 text-emerald-700" />;
-    }
-  };
-
-  const getCategoryLabel = (category: CardCategory) => {
-    switch (category) {
-      case 'AIM':
-        return 'Bidikan';
-      case 'LAUNCH':
-        return 'Daya Sentil';
-      case 'LOADOUT':
-        return 'Kelereng';
-      default:
-        return 'Arena';
-    }
-  };
+  const isInteracting =
+    aimingState === 'AIMING' ||
+    aimingState === 'CHARGING' ||
+    aimingState === 'AIRBORNE' ||
+    aimingState === 'SIMULATING';
 
   return (
     <div
       data-testid="card-deck-overlay"
-      className={`fixed bottom-24 sm:bottom-20 left-1/2 -translate-x-1/2 z-30 pointer-events-auto transition-all duration-300 flex flex-col items-center max-w-2xl w-[94%] ${
-        isInteracting ? 'opacity-40 pointer-events-none' : 'opacity-100'
+      className={`fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto transition-all duration-300 flex flex-col items-center max-w-2xl w-auto ${
+        isInteracting ? 'opacity-35 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Top Deck Bar: Chalk Energy & Collapse Toggle (Timbul card) */}
-      <div className="timbul-card px-4 py-2 mb-2 w-full flex items-center justify-between gap-3">
-        {/* Chalk Energy Resource Meter */}
-        <div data-testid="chalk-energy-meter" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-amber-100 border-2 border-amber-300 border-b-[3px] border-b-amber-400 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-amber-800" />
-          </div>
-          <div className="flex flex-col text-left">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-stone-600">
-                Kapur Gambar 🖍️
-              </span>
-              <span className="text-xs font-black font-mono text-[#d54425]">
-                {chalkEnergy}/{MAX_CHALK_ENERGY}
-              </span>
-            </div>
-            {/* Visual Chunky Chalk Sticks Indicator */}
-            <div className="flex items-center gap-1 mt-0.5">
-              {Array.from({ length: MAX_CHALK_ENERGY }).map((_, i) => (
-                <div
-                  key={`chalk-stick-${i}`}
-                  className={`w-3.5 h-2 rounded-sm transition-all duration-200 ${
-                    i < chalkEnergy
-                      ? 'bg-amber-400 border-b-2 border-amber-600 shadow-sm'
-                      : 'bg-stone-200 border-b-2 border-stone-300'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
+      {/* Minimalist Floating Chalk Resource Indicator */}
+      <div className="flex items-center gap-2 mb-2 px-3 py-1 bg-stone-900/85 backdrop-blur-md rounded-full border border-stone-700/60 shadow-lg select-none">
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[10px] sm:text-[11px] font-bold text-stone-300 uppercase tracking-wider">
+            Kapur
+          </span>
+          <span className="text-[11px] sm:text-xs font-black font-mono text-amber-300">
+            {chalkEnergy}/{MAX_CHALK_ENERGY}
+          </span>
         </div>
 
-        {/* Active Card Notification or Deck Status */}
         {activeCardId && (
-          <div className="flex items-center gap-2 bg-[#fff8f5] border-2 border-[#ffcfc4] border-b-[3px] border-b-[#f57b64] rounded-xl px-3 py-1 text-[#d54425] text-xs font-extrabold animate-pulse">
-            <span>✨ Jurus Siap Dipakai!</span>
+          <div className="flex items-center gap-1.5 pl-2 border-l border-stone-700">
+            <span className="text-[10px] font-extrabold text-[#ff7854] animate-pulse">
+              ✨ Jurus Aktif!
+            </span>
             <button
               onClick={deselectCard}
-              className="p-0.5 rounded hover:bg-orange-100 text-[#d54425] transition-colors cursor-pointer"
+              className="text-stone-400 hover:text-white p-0.5 rounded cursor-pointer transition-colors"
               title="Batal Memakai Jurus"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3 h-3" />
             </button>
           </div>
         )}
-
-        {/* Toggle Expand / Collapse Button (Timbul cream button) */}
-        <button
-          data-testid="toggle-deck-btn"
-          onClick={toggleDeckExpanded}
-          className="timbul-btn-cream px-3 py-1.5 flex items-center gap-1.5 text-xs cursor-pointer"
-        >
-          <span>{isDeckExpanded ? 'Tutup Kantung' : 'Kantung Trik'}</span>
-          {isDeckExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-        </button>
       </div>
 
-      {/* Expanded Hand of 3 Cards */}
-      {isDeckExpanded && (
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
-          {handCards.map((card) => {
-            const isActive = activeCardId === card.id;
-            const canAfford = chalkEnergy >= card.cost;
+      {/* 4 Cards Arranged in Horizontal Row Exactly Like Reference Screenshot */}
+      <div className="flex items-end justify-center gap-2 sm:gap-2.5 w-auto">
+        {handCards.map((card) => {
+          const isActive = activeCardId === card.id;
+          const canAfford = chalkEnergy >= card.cost;
 
-            return (
+          return (
+            <div
+              key={card.id}
+              data-testid={`card-${card.id}`}
+              onClick={() => {
+                if (canAfford || isActive) {
+                  selectCard(card.id);
+                }
+              }}
+              className={`relative select-none cursor-pointer transition-all duration-200 transform-gpu ${
+                isActive
+                  ? 'z-20 -translate-y-5 sm:-translate-y-7 -rotate-2 scale-[1.03]'
+                  : canAfford
+                    ? 'z-10 translate-y-0 rotate-0 hover:-translate-y-2.5'
+                    : 'z-10 translate-y-0 rotate-0 opacity-45 grayscale contrast-75 cursor-not-allowed'
+              }`}
+            >
+              {/* Card Container (No outer borders, strictly clipped rounded corners) */}
               <div
-                key={card.id}
-                data-testid={`card-${card.id}`}
-                onClick={() => {
-                  if (canAfford || isActive) {
-                    selectCard(card.id);
-                  }
-                }}
-                className={`relative rounded-2xl p-2.5 sm:p-3 text-left transition-all duration-150 flex flex-col justify-between select-none cursor-pointer ${
+                className={`relative overflow-hidden rounded-xl sm:rounded-2xl aspect-[0.72] w-[86px] sm:w-[108px] md:w-[134px] transition-all duration-200 bg-stone-900 ${
                   isActive
-                    ? 'bg-[#fff8f5] border-2 border-[#ff6242] border-b-[5px] border-b-[#d54425] ring-2 ring-orange-300/40 -translate-y-1'
-                    : canAfford
-                      ? 'bg-white hover:bg-[#faf7f2] border-2 border-[#eee6dc] border-b-[5px] border-b-[#ded4c5] hover:border-b-[#c9bfae] active:translate-y-[2px] active:border-b-[3px]'
-                      : 'bg-stone-100/70 border-2 border-stone-200 border-b-[4px] border-b-stone-300 opacity-50 cursor-not-allowed'
+                    ? 'border-[3px] border-white shadow-[0_0_22px_rgba(255,255,255,0.9),0_12px_28px_rgba(0,0,0,0.55)]'
+                    : 'border-0 shadow-md'
                 }`}
               >
-                {/* Header: Cost & Rarity */}
-                <div className="flex items-center justify-between gap-1 mb-1.5">
-                  <div className="flex items-center gap-1 bg-[#fdfbf7] border-2 border-[#eee6dc] border-b-[2px] border-b-[#ded4c5] rounded-lg px-1.5 py-0.5">
-                    <span className="text-[10px] font-black font-mono text-[#d54425]">
-                      {card.cost}
-                    </span>
-                    <span className="text-[8px] uppercase tracking-wider text-stone-500 font-bold">Kapur</span>
-                  </div>
+                {/* 
+                  scale-[1.16] zooms in past the 6.7% horizontal & 5.17% vertical white padding,
+                  guaranteeing 100% elimination of whitespace so the card artwork fills edge-to-edge
+                */}
+                <img
+                  src={card.imageUrl}
+                  alt={card.name}
+                  className="w-full h-full object-cover scale-[1.16] transform-gpu pointer-events-none select-none"
+                  loading="lazy"
+                />
 
-                  <span
-                    className={`text-[8px] uppercase tracking-wider font-black px-1.5 py-0.5 rounded-lg border-2 border-b-[2px] ${getRarityBadge(
-                      card.rarity
-                    )}`}
-                  >
-                    {getRarityLabel(card.rarity)}
+                {/* Subtle Chalk Cost Indicator (Top-Left) */}
+                <div className="absolute top-1.5 left-1.5 flex items-center gap-0.5 bg-black/70 backdrop-blur-sm rounded-md px-1.5 py-0.5 shadow-sm">
+                  <span className="text-[10px] sm:text-[11px] font-black font-mono text-amber-300">
+                    {card.cost}
+                  </span>
+                  <span className="text-[8px] sm:text-[9px] text-stone-200">
+                    🖍️
                   </span>
                 </div>
 
-                {/* Card Title & Category */}
-                <div className="mb-1">
-                  <div className="flex items-center gap-1">
-                    {getCategoryIcon(card.category)}
-                    <h3 className="text-xs sm:text-sm font-bold text-stone-800 truncate">
-                      {card.name}
-                    </h3>
-                  </div>
-                  <p className="text-[10px] sm:text-[11px] text-stone-600 leading-snug line-clamp-2 mt-0.5">
-                    {card.description}
-                  </p>
-                </div>
-
-                {/* Active Status Badge */}
-                <div className="mt-1 flex items-center justify-between pt-1 border-t border-stone-200">
-                  <span className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold font-mono">
-                    {getCategoryLabel(card.category)}
-                  </span>
-                  {isActive && (
-                    <span className="text-[9px] font-extrabold text-amber-700 font-mono tracking-wider animate-pulse">
-                      ● AKTIF
+                {/* Insufficient Chalk Overlay */}
+                {!canAfford && !isActive && (
+                  <div className="absolute inset-0 bg-stone-950/45 backdrop-blur-[0.5px] flex items-center justify-center p-1 text-center">
+                    <span className="bg-stone-900/90 text-stone-300 text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded border border-stone-700/60 shadow-md">
+                      Kapur Kurang
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

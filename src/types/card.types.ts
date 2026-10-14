@@ -29,6 +29,7 @@ export const TacticalCardSchema = z.object({
   rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'EPIC']),
   enabled: z.boolean().default(true),
   modifier: PhysicsModifierSchema,
+  imageUrl: z.string().optional(),
 });
 
 export type TacticalCard = z.infer<typeof TacticalCardSchema>;

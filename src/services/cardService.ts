@@ -10,6 +10,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 1,
     rarity: 'COMMON',
     enabled: true,
+    imageUrl: '/assets/power-cards/bedak-jari.jpg',
     modifier: {
       trajectoryDistanceMultiplier: 1.8,
       frictionMultiplier: 1.0,
@@ -29,6 +30,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 2,
     rarity: 'EPIC',
     enabled: true,
+    imageUrl: '/assets/power-cards/karet-gelang.jpg',
     modifier: {
       impulseMultiplier: 1.4,
       trajectoryDistanceMultiplier: 1.0,
@@ -48,6 +50,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 1,
     rarity: 'UNCOMMON',
     enabled: true,
+    imageUrl: '/assets/power-cards/sentilan-cungkil.jpg',
     modifier: {
       apexHeightMultiplier: 2.2,
       verticalImpulseRatio: 0.35,
@@ -67,6 +70,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 1,
     rarity: 'COMMON',
     enabled: true,
+    imageUrl: '/assets/power-cards/sentilan-halus.jpg',
     modifier: {
       precisionForceRatio: 0.5,
       impulseMultiplier: 0.65,
@@ -86,6 +90,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 2,
     rarity: 'COMMON',
     enabled: true,
+    imageUrl: '/assets/power-cards/tukar-gotri-besi.jpg',
     modifier: {
       swapMaterial: 'BEARING_STEEL',
       impulseMultiplier: 1.15,
@@ -106,6 +111,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 1,
     rarity: 'COMMON',
     enabled: true,
+    imageUrl: '/assets/power-cards/sapu-lidi.jpg',
     modifier: {
       frictionMultiplier: 0.6,
       impulseMultiplier: 1.1,
@@ -125,6 +131,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 2,
     rarity: 'COMMON',
     enabled: true,
+    imageUrl: '/assets/power-cards/papan-pantul.png',
     modifier: {
       restitutionBonus: 0.25,
       impulseMultiplier: 1.05,
@@ -144,6 +151,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 2,
     rarity: 'RARE',
     enabled: true,
+    imageUrl: '/assets/power-cards/kipas-kardus.png',
     modifier: {
       impulseMultiplier: 1.2,
       trajectoryDistanceMultiplier: 1.15,
@@ -163,6 +171,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
     cooldownTurns: 3,
     rarity: 'EPIC',
     enabled: true,
+    imageUrl: '/assets/power-cards/batu-magnet.png',
     modifier: {
       impulseMultiplier: 1.3,
       restitutionBonus: 0.15,
