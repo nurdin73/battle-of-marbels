@@ -10,6 +10,7 @@ import {
 import { ARENA_CONFIG, DEFAULT_SWIRL_COLORS, GAMEPLAY_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { useCardStore } from './useCardStore';
+import { useMultiplayerStore } from './useMultiplayerStore';
 
 interface DragState {
   vector: { x: number; z: number };
@@ -435,6 +436,70 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         starsAwarded = 2;
       } else {
         starsAwarded = 1;
+      }
+    }
+
+    // MULTIPLAYER PvP Synchronization
+    const mpStore = useMultiplayerStore.getState();
+    if (mpStore.isMultiplayer) {
+      if (mpStore.role === 'GUEST') {
+        // Guest local simulation ends; wait for Host's authoritative state sync
+        set({
+          aimingState: 'IDLE',
+          gacoanCurrentPos: nextGacoanPos,
+        });
+        return;
+      } else if (mpStore.role === 'HOST') {
+        // HOST decides official points and next turn
+        const currentShooterId = mpStore.currentTurnPlayerId || mpStore.localPlayer.id;
+        const isHostShooting = currentShooterId === mpStore.localPlayer.id;
+
+        let nextP1Score = mpStore.p1Score;
+        let nextP2Score = mpStore.p2Score;
+
+        if (targetsPocketedCount > 0 && !isGacoanFouled) {
+          if (isHostShooting) {
+            nextP1Score += targetsPocketedCount;
+          } else {
+            nextP2Score += targetsPocketedCount;
+          }
+        }
+
+        // Combo extra turn if pocketed without foul, else pass turn to opponent
+        let nextTurnPlayerId = currentShooterId;
+        if (isGacoanFouled || targetsPocketedCount === 0) {
+          nextTurnPlayerId = isHostShooting
+            ? (mpStore.opponentPlayer?.id || 'guest')
+            : mpStore.localPlayer.id;
+        }
+
+        const isPvPOver = nextP1Score + nextP2Score >= totalTargets;
+        let winnerId: string | null = null;
+        if (isPvPOver) {
+          if (nextP1Score > nextP2Score) winnerId = mpStore.localPlayer.id;
+          else if (nextP2Score > nextP1Score) winnerId = mpStore.opponentPlayer?.id || 'guest';
+        }
+
+        mpStore.broadcastHostSync({
+          type: 'HOST_STATE_SYNC',
+          targetLivePositions: state.targetLivePositions,
+          marblesOutsideRing: nextMarblesOutside,
+          gacoanPos: nextGacoanPos,
+          p1Score: nextP1Score,
+          p2Score: nextP2Score,
+          nextTurnPlayerId,
+          outcomeMessage: resultOutcome.message,
+          isGameOver: isPvPOver,
+          winnerId,
+        });
+
+        useMultiplayerStore.setState({
+          p1Score: nextP1Score,
+          p2Score: nextP2Score,
+          currentTurnPlayerId: nextTurnPlayerId,
+          localPlayer: { ...mpStore.localPlayer, score: nextP1Score },
+          opponentPlayer: mpStore.opponentPlayer ? { ...mpStore.opponentPlayer, score: nextP2Score } : null,
+        });
       }
     }
 

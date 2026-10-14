@@ -4,6 +4,7 @@ import { ThreeEvent, useThree } from '@react-three/fiber';
 import { RapierRigidBody } from '@react-three/rapier';
 import { useGameStore } from '../store/useGameStore';
 import { useCardStore } from '../store/useCardStore';
+import { useMultiplayerStore } from '../store/useMultiplayerStore';
 import { ARENA_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { calculateTrajectory } from '../utils/trajectory.utils';
@@ -79,6 +80,21 @@ export function useSlingshot(
       const isLob = activeCard?.id === 'CARD_LOB';
       const normX = lockedDir.x;
       const normZ = lockedDir.z;
+
+      // Broadcast shot to opponent if in multiplayer
+      const mpState = useMultiplayerStore.getState();
+      if (mpState.isMultiplayer && mpState.isMyTurn()) {
+        mpState.broadcastShot(
+          {
+            x: normX * effectiveImpulse,
+            y: 0.0,
+            z: normZ * effectiveImpulse,
+          },
+          clampedPercentage,
+          isLob,
+          [shooterOrigin.x, shooterOrigin.y, shooterOrigin.z]
+        );
+      }
 
       if (isLob) {
         // LOB MODE: Parabolic arch through the air (CARD_LOB exclusive)
@@ -160,6 +176,9 @@ export function useSlingshot(
       // Only allow aiming when game is active (PLAYING) and IDLE
       if (currentScreen !== 'PLAYING' || aimingState !== 'IDLE') return;
 
+      // In multiplayer: block interaction if it's not my turn!
+      if (useMultiplayerStore.getState().isMultiplayer && !useMultiplayerStore.getState().isMyTurn()) return;
+
       e.stopPropagation();
       marbleAudio.startAmbientSound();
       setIsDragging(true);
@@ -203,6 +222,11 @@ export function useSlingshot(
         const dirZ = dist > 0.001 ? (deltaZ / dist) * clampedDist : 0;
 
         setDrag({ x: dirX, z: dirZ }, clampedDist, percentage);
+
+        const mpState = useMultiplayerStore.getState();
+        if (mpState.isMultiplayer && mpState.isMyTurn()) {
+          mpState.broadcastAim({ x: dirX, z: dirZ }, percentage);
+        }
       }
     };
 

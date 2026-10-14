@@ -6,6 +6,7 @@ import { Vector3D } from '../../types/physics.types';
 import { useCardStore } from '../../store/useCardStore';
 import { useLevelStore } from '../../store/useLevelStore';
 import { ADVENTURE_LEVELS } from '../../constants/levels.constants';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 
 export const TrajectoryLine: React.FC = () => {
   const aimingState = useGameStore((s) => s.aimingState);
@@ -14,6 +15,10 @@ export const TrajectoryLine: React.FC = () => {
   const targetMarbles = useGameStore((s) => s.targetMarbles);
   const marblesOutsideRing = useGameStore((s) => s.marblesOutsideRing);
   const gacoanPos = useGameStore((s) => s.gacoanCurrentPos);
+
+  const isMultiplayer = useMultiplayerStore((s) => s.isMultiplayer);
+  const isMyTurn = useMultiplayerStore((s) => s.isMyTurn());
+  const opponentAim = useMultiplayerStore((s) => s.opponentAim);
 
   const activeCardId = useCardStore((s) => s.activeCardId);
   const handCards = useCardStore((s) => s.handCards);
@@ -114,15 +119,60 @@ export const TrajectoryLine: React.FC = () => {
     combinedObstacles,
   ]);
 
-  if (!trajectory || trajectory.points.length === 0) return null;
+  const opponentTrajectory = useMemo(() => {
+    if (!isMultiplayer || isMyTurn || !opponentAim || !opponentAim.direction) {
+      return null;
+    }
 
-  const dotColor = trajectory.isHit ? '#f43f5e' : isLob ? '#a855f7' : '#38bdf8';
-  const ringColor = trajectory.isHit ? '#f43f5e' : '#38bdf8';
+    const dirVector = {
+      x: opponentAim.direction.x * ARENA_CONFIG.maxDragDistance,
+      y: 0,
+      z: opponentAim.direction.z * ARENA_CONFIG.maxDragDistance,
+    };
+
+    const options = {
+      isLob: false,
+      obstacles: combinedObstacles,
+    };
+
+    return calculateTrajectory(
+      shooterOrigin,
+      dirVector,
+      opponentAim.powerPercentage,
+      activeTargets,
+      ARENA_CONFIG.marbleRadius,
+      options
+    );
+  }, [
+    isMultiplayer,
+    isMyTurn,
+    opponentAim,
+    shooterOrigin,
+    activeTargets,
+    combinedObstacles,
+  ]);
+
+  const activeTrajectory = trajectory || opponentTrajectory;
+  if (!activeTrajectory || activeTrajectory.points.length === 0) return null;
+
+  const isOpponent = !trajectory && !!opponentTrajectory;
+  const dotColor = isOpponent
+    ? '#f59e0b'
+    : activeTrajectory.isHit
+    ? '#f43f5e'
+    : isLob
+    ? '#a855f7'
+    : '#38bdf8';
+  const ringColor = isOpponent
+    ? '#f59e0b'
+    : activeTrajectory.isHit
+    ? '#f43f5e'
+    : '#38bdf8';
 
   return (
     <group>
       {/* Primary Aim Path (Flat on ground for default, 3D Arc for Lob) */}
-      {trajectory.points.map((pt, idx) => (
+      {activeTrajectory.points.map((pt, idx) => (
         <mesh key={`aim-pt-${idx}`} position={pt.position}>
           <sphereGeometry args={[pt.scale, 12, 12]} />
           <meshBasicMaterial
@@ -134,9 +184,9 @@ export const TrajectoryLine: React.FC = () => {
       ))}
 
       {/* Target Impact Marker Ring (Ground Mode Hit) */}
-      {trajectory.impactPoint && (
+      {activeTrajectory.impactPoint && (
         <group
-          position={[trajectory.impactPoint[0], 0.007, trajectory.impactPoint[2]]}
+          position={[activeTrajectory.impactPoint[0], 0.007, activeTrajectory.impactPoint[2]]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
           <mesh>
@@ -147,13 +197,13 @@ export const TrajectoryLine: React.FC = () => {
                 24,
               ]}
             />
-            <meshBasicMaterial color="#f43f5e" transparent opacity={0.85} />
+            <meshBasicMaterial color={ringColor} transparent opacity={0.85} />
           </mesh>
         </group>
       )}
 
       {/* Secondary Target Kick Preview (Amber line showing kicked target direction) */}
-      {trajectory.targetKickPoints?.map((pt, idx) => (
+      {activeTrajectory.targetKickPoints?.map((pt, idx) => (
         <mesh key={`target-kick-${idx}`} position={pt.position}>
           <sphereGeometry args={[pt.scale, 10, 10]} />
           <meshBasicMaterial color="#f59e0b" transparent opacity={pt.alpha} />
@@ -161,7 +211,7 @@ export const TrajectoryLine: React.FC = () => {
       ))}
 
       {/* Secondary Shooter Deflection Preview (Sky blue line showing rebound angle) */}
-      {trajectory.shooterDeflectPoints?.map((pt, idx) => (
+      {activeTrajectory.shooterDeflectPoints?.map((pt, idx) => (
         <mesh key={`deflect-pt-${idx}`} position={pt.position}>
           <sphereGeometry args={[pt.scale, 10, 10]} />
           <meshBasicMaterial color="#38bdf8" transparent opacity={pt.alpha} />
@@ -169,12 +219,12 @@ export const TrajectoryLine: React.FC = () => {
       ))}
 
       {/* Lob Mode Ground Landing Circle Marker */}
-      {isLob && (
+      {isLob && activeTrajectory.landingPoint && (
         <group
           position={[
-            trajectory.landingPoint[0],
+            activeTrajectory.landingPoint[0],
             0.007,
-            trajectory.landingPoint[2],
+            activeTrajectory.landingPoint[2],
           ]}
           rotation={[-Math.PI / 2, 0, 0]}
         >

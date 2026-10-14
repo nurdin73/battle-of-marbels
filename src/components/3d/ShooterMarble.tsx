@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { BallCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
@@ -9,6 +9,8 @@ import {
   SCENE_PERIMETER_BOUNDS,
 } from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
+import { MarbleMaterialType } from '../../types/physics.types';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
@@ -22,6 +24,7 @@ export const ShooterMarble: React.FC = () => {
   const outOfSceneTimerRef = useRef<number>(0);
 
   const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
+  const gacoanCurrentPos = useGameStore((s) => s.gacoanCurrentPos);
   const aimingState = useGameStore((s) => s.aimingState);
   const setAimingState = useGameStore((s) => s.setAimingState);
   const updateGacoanPos = useGameStore((s) => s.updateGacoanPos);
@@ -31,8 +34,24 @@ export const ShooterMarble: React.FC = () => {
   const flightData = useGameStore((s) => s.flightData);
   const setFlightData = useGameStore((s) => s.setFlightData);
 
+  const isMultiplayer = useMultiplayerStore((s) => s.isMultiplayer);
+  const currentTurnPlayerId = useMultiplayerStore((s) => s.currentTurnPlayerId);
+  const localPlayer = useMultiplayerStore((s) => s.localPlayer);
+  const opponentPlayer = useMultiplayerStore((s) => s.opponentPlayer);
+  const setOnOpponentShotCallback = useMultiplayerStore((s) => s.setOnOpponentShotCallback);
+
   const evaluationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const physicalConfig = MARBLE_PHYSICAL_CONFIGS[gacoanMaterial];
+
+  // Dynamic Gacoan Material: displays the current turn player's chosen marble in PvP
+  const activeMaterial: MarbleMaterialType = useMemo(() => {
+    if (!isMultiplayer) return gacoanMaterial;
+    if (currentTurnPlayerId === localPlayer.id) {
+      return localPlayer.gacoanMaterial;
+    }
+    return opponentPlayer?.gacoanMaterial ?? 'BEARING_STEEL';
+  }, [isMultiplayer, currentTurnPlayerId, localPlayer, opponentPlayer, gacoanMaterial]);
+
+  const physicalConfig = MARBLE_PHYSICAL_CONFIGS[activeMaterial];
 
   const { onPointerDown } = useSlingshot(rigidBodyRef);
 
@@ -69,6 +88,79 @@ export const ShooterMarble: React.FC = () => {
       }
     };
   }, []);
+
+  // Listen for opponent shots in 1v1 PvP
+  useEffect(() => {
+    if (!isMultiplayer) return;
+
+    setOnOpponentShotCallback((shotData) => {
+      if (!rigidBodyRef.current) return;
+
+      if (shotData.isLob) {
+        const apexHeight = 0.6;
+        const duration = 0.72;
+        const impulseMag = Math.hypot(shotData.impulse.x, shotData.impulse.z);
+        const normX = impulseMag > 0 ? shotData.impulse.x / impulseMag : 0;
+        const normZ = impulseMag > 0 ? shotData.impulse.z / impulseMag : 1;
+        const landingDist = (shotData.powerPercentage / 100) * 2.5;
+        const landingPoint: [number, number, number] = [
+          shotData.shooterPos[0] + normX * landingDist,
+          ARENA_CONFIG.marbleRadius,
+          shotData.shooterPos[2] + normZ * landingDist,
+        ];
+        setFlightData({
+          origin: shotData.shooterPos,
+          landingPoint,
+          apexHeight,
+          duration,
+          direction: { x: normX, z: normZ },
+          impulseMagnitude: impulseMag,
+          isHit: false,
+        });
+        setAimingState('AIRBORNE');
+      } else {
+        rigidBodyRef.current.setTranslation(
+          {
+            x: shotData.shooterPos[0],
+            y: shotData.shooterPos[1],
+            z: shotData.shooterPos[2],
+          },
+          true
+        );
+        rigidBodyRef.current.wakeUp();
+        rigidBodyRef.current.applyImpulse(
+          {
+            x: shotData.impulse.x,
+            y: shotData.impulse.y,
+            z: shotData.impulse.z,
+          },
+          true
+        );
+        marbleAudio.playLaunchSound(shotData.powerPercentage / 100);
+        setAimingState('SIMULATING');
+      }
+    });
+
+    return () => {
+      setOnOpponentShotCallback(null);
+    };
+  }, [isMultiplayer, setOnOpponentShotCallback, setFlightData, setAimingState]);
+
+  // Sync gacoan resting position across peers upon idle
+  useEffect(() => {
+    if (isMultiplayer && aimingState === 'IDLE' && rigidBodyRef.current) {
+      rigidBodyRef.current.setTranslation(
+        {
+          x: gacoanCurrentPos[0],
+          y: gacoanCurrentPos[1],
+          z: gacoanCurrentPos[2],
+        },
+        true
+      );
+      rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+  }, [isMultiplayer, aimingState, gacoanCurrentPos]);
 
   // Sync gacoan position & monitor velocity during SIMULATING phase
   useFrame((_, delta) => {
@@ -120,7 +212,7 @@ export const ShooterMarble: React.FC = () => {
           // Let Rapier WASM contact solver compute natural torque without artificial spin
           rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
           marbleAudio.playCollisionSound({
-            materialType: gacoanMaterial,
+            materialType: activeMaterial,
             relativeVelocity: speed,
           });
         } else {
@@ -128,7 +220,7 @@ export const ShooterMarble: React.FC = () => {
           rigidBodyRef.current.setLinvel({ x: dirX * forwardSpeed, y: 0.06, z: dirZ * forwardSpeed }, true);
           rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
           marbleAudio.playCollisionSound({
-            materialType: gacoanMaterial,
+            materialType: activeMaterial,
             relativeVelocity: speed * 0.45,
           });
         }
@@ -249,14 +341,14 @@ export const ShooterMarble: React.FC = () => {
     const speed = linvel ? Math.hypot(linvel.x, linvel.y, linvel.z) : 0.8;
     if (speed > 0.05) {
       marbleAudio.playCollisionSound({
-        materialType: gacoanMaterial,
+        materialType: activeMaterial,
         relativeVelocity: speed,
       });
     }
   };
 
   const renderMaterial = () => {
-    if (gacoanMaterial === 'GLASS_CLASSIC') {
+    if (activeMaterial === 'GLASS_CLASSIC') {
       return (
         <group>
           {/* Optical Clear Translucent Outer Glass Shell */}
@@ -310,7 +402,7 @@ export const ShooterMarble: React.FC = () => {
       );
     }
 
-    if (gacoanMaterial === 'MARBLE_STONE') {
+    if (activeMaterial === 'MARBLE_STONE') {
       return (
         <group>
           <mesh castShadow receiveShadow>

@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { useLevelStore } from '../../store/useLevelStore';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { ADVENTURE_LEVELS } from '../../constants/levels.constants';
 import { Trophy, Star, RotateCcw, Target, Zap, ArrowRight, Compass } from 'lucide-react';
 
 export const GameOverModal: React.FC = () => {
   const isGameOver = useGameStore((s) => s.isGameOver);
+  const isMultiplayer = useMultiplayerStore((s) => s.isMultiplayer);
   const score = useGameStore((s) => s.score);
   const flickCount = useGameStore((s) => s.flickCount);
   const starsAwarded = useGameStore((s) => s.starsAwarded);
@@ -25,14 +27,14 @@ export const GameOverModal: React.FC = () => {
     ? ADVENTURE_LEVELS[currentLevelIndex + 1]
     : null;
 
-  // Record completion to persistent storage on win
+  // Record completion to persistent storage on win (solo mode only)
   useEffect(() => {
-    if (isGameOver) {
+    if (isGameOver && !isMultiplayer) {
       recordLevelCompletion(currentLevelId, flickCount);
     }
-  }, [isGameOver, currentLevelId, flickCount, recordLevelCompletion]);
+  }, [isGameOver, isMultiplayer, currentLevelId, flickCount, recordLevelCompletion]);
 
-  if (!isGameOver) return null;
+  if (!isGameOver || isMultiplayer) return null;
 
   const handleNextLevel = () => {
     if (!nextLevel) {
