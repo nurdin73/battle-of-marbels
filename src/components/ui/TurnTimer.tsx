@@ -20,8 +20,9 @@ export const TurnTimer: React.FC = () => {
     return () => clearInterval(interval);
   }, [isTimerActive, isGameOver, aimingState, tickTimer]);
 
-  const isUrgent = turnTimer <= 5;
-  const formattedSeconds = turnTimer.toString().padStart(2, '0');
+  const isSantai = turnTimer === null;
+  const isUrgent = turnTimer !== null && turnTimer <= 5;
+  const formattedSeconds = turnTimer !== null ? turnTimer.toString().padStart(2, '0') : '';
 
   return (
     <div
@@ -31,14 +32,23 @@ export const TurnTimer: React.FC = () => {
       <span className="font-heading text-lg sm:text-xl font-black tracking-wider text-[#fde047] text-stroke-black-heavy">
         GILIRAN KAMU!
       </span>
-      <span
-        data-testid="turn-timer-value"
-        className={`font-mono text-base sm:text-lg font-black tracking-wider text-stroke-black-heavy -mt-0.5 ${
-          isUrgent ? 'text-[#ff6242] animate-pulse' : 'text-white'
-        }`}
-      >
-        0:{formattedSeconds}s
-      </span>
+      {isSantai ? (
+        <span
+          data-testid="turn-timer-santai"
+          className="font-heading text-xs sm:text-sm font-black tracking-wider text-amber-200 text-stroke-black-heavy mt-0.5"
+        >
+          ☕ Mode Santai
+        </span>
+      ) : (
+        <span
+          data-testid="turn-timer-value"
+          className={`font-mono text-base sm:text-lg font-black tracking-wider text-stroke-black-heavy -mt-0.5 ${
+            isUrgent ? 'text-[#ff6242] animate-pulse' : 'text-white'
+          }`}
+        >
+          0:{formattedSeconds}s
+        </span>
+      )}
     </div>
   );
 };

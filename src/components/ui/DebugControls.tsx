@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/useGameStore';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { RotateCcw, Volume2, VolumeX, Eye, EyeOff, HelpCircle } from 'lucide-react';
 
 interface DebugControlsProps {
@@ -7,6 +8,7 @@ interface DebugControlsProps {
 }
 
 export const DebugControls: React.FC<DebugControlsProps> = ({ onOpenHelp }) => {
+  const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
   const resetArena = useGameStore((s) => s.resetArena);
   const toggleMute = useGameStore((s) => s.toggleMute);
   const toggleTrajectory = useGameStore((s) => s.toggleTrajectory);
@@ -46,16 +48,18 @@ export const DebugControls: React.FC<DebugControlsProps> = ({ onOpenHelp }) => {
         {!isMuted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
       </button>
 
-      {/* Reset Arena Button (Reset) */}
-      <button
-        data-testid="reset-arena-btn"
-        onClick={resetArena}
-        title="Tata Ulang Kelereng ke Posisi Awal"
-        className="timbul-btn-coral flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer h-9"
-      >
-        <RotateCcw className="w-3.5 h-3.5 text-white" />
-        <span className="hidden sm:inline">Tata Ulang</span>
-      </button>
+      {/* Reset Arena Button (Reset - Solo Mode Only) */}
+      {!isMultiplayerActive && (
+        <button
+          data-testid="reset-arena-btn"
+          onClick={resetArena}
+          title="Tata Ulang Kelereng ke Posisi Awal"
+          className="timbul-btn-coral flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer h-9"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-white" />
+          <span className="hidden sm:inline">Tata Ulang</span>
+        </button>
+      )}
 
       {/* Help & Guide Modal Trigger (?) */}
       {onOpenHelp && (

@@ -9,7 +9,6 @@ import {
   SCENE_PERIMETER_BOUNDS,
 } from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
-import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 
@@ -31,10 +30,6 @@ export const ShooterMarble: React.FC = () => {
   const resetRevision = useGameStore((s) => s.resetRevision);
   const flightData = useGameStore((s) => s.flightData);
   const setFlightData = useGameStore((s) => s.setFlightData);
-
-  const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
-  const currentTurnPlayerId = useMultiplayerStore((s) => s.currentTurnPlayerId);
-  const localPlayer = useMultiplayerStore((s) => s.localPlayer);
 
   const evaluationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const physicalConfig = MARBLE_PHYSICAL_CONFIGS[gacoanMaterial];
@@ -74,41 +69,6 @@ export const ShooterMarble: React.FC = () => {
       }
     };
   }, []);
-
-  // Register multiplayer listeners for remote shots and rest-state reconciliation
-  useEffect(() => {
-    const multiplayerStore = useMultiplayerStore.getState();
-
-    multiplayerStore.setRemoteShotListener((payload) => {
-      if (!rigidBodyRef.current) return;
-      rigidBodyRef.current.setTranslation(
-        { x: payload.originPosition.x, y: payload.originPosition.y, z: payload.originPosition.z },
-        true
-      );
-      rigidBodyRef.current.wakeUp();
-      rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      rigidBodyRef.current.applyImpulse(payload.impulse, true);
-      marbleAudio.playLaunchSound(0.7);
-      setAimingState('SIMULATING');
-    });
-
-    multiplayerStore.setRemoteRestStateListener((payload) => {
-      if (!rigidBodyRef.current) return;
-      const currentTrans = rigidBodyRef.current.translation();
-      const targetPos = payload.gacoanPosition;
-      const diff = Math.hypot(currentTrans.x - targetPos[0], currentTrans.z - targetPos[2]);
-      if (diff > 0.05) {
-        rigidBodyRef.current.setTranslation({ x: targetPos[0], y: targetPos[1], z: targetPos[2] }, true);
-        updateGacoanPos(targetPos);
-      }
-    });
-
-    return () => {
-      multiplayerStore.setRemoteShotListener(null);
-      multiplayerStore.setRemoteRestStateListener(null);
-    };
-  }, [setAimingState, updateGacoanPos]);
 
   // Sync gacoan position & monitor velocity during SIMULATING phase
   useFrame((_, delta) => {
@@ -263,47 +223,6 @@ export const ShooterMarble: React.FC = () => {
               : INITIAL_SHOOTER_POS;
 
             evaluateTurnOutcome(finalPos);
-
-            // Host broadcasts authoritative rest-state to guest
-            const mpStore = useMultiplayerStore.getState();
-            if (mpStore.isMultiplayerActive && mpStore.role === 'HOST') {
-              const gameState = useGameStore.getState();
-              const isCombo = gameState.lastTurnOutcome?.resultType === 'COMBO_EXTRA_TURN';
-              const targetsPocketed = gameState.targetsPocketedThisTurn || 0;
-              const isHostTurn = mpStore.currentTurnPlayerId === mpStore.localPlayer.id;
-
-              const nextScores = {
-                host: isHostTurn ? mpStore.scores.host + targetsPocketed : mpStore.scores.host,
-                guest: !isHostTurn ? mpStore.scores.guest + targetsPocketed : mpStore.scores.guest,
-              };
-
-              const nextTurnId = isCombo
-                ? mpStore.currentTurnPlayerId!
-                : isHostTurn
-                ? (mpStore.remotePlayer?.id || mpStore.localPlayer.id)
-                : mpStore.localPlayer.id;
-
-              mpStore.broadcastRestState({
-                turnIndex: gameState.turnCount,
-                gacoanPosition: finalPos,
-                targetPositions: gameState.targetLivePositions,
-                marblesOutsideRing: gameState.marblesOutsideRing,
-                scores: nextScores,
-                nextTurnPlayerId: nextTurnId,
-              });
-            }
-
-            const distFromOrigin = Math.hypot(finalPos[0], finalPos[2]);
-            const isFoul = distFromOrigin > ARENA_CONFIG.ringRadius + ARENA_CONFIG.marbleRadius;
-
-            if (isFoul && rigidBodyRef.current) {
-              const resetPos = GAMEPLAY_CONFIG.foulResetPosition;
-              rigidBodyRef.current.setTranslation({ x: resetPos[0], y: resetPos[1], z: resetPos[2] }, true);
-              rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-              rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-              updateGacoanPos(resetPos);
-            }
-
             setAimingState('IDLE');
           }, 400);
         }, 2000);
@@ -440,17 +359,7 @@ export const ShooterMarble: React.FC = () => {
         {aimingState === 'IDLE' && (
           <mesh position={[0, -ARENA_CONFIG.marbleRadius + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[ARENA_CONFIG.marbleRadius * 1.3, ARENA_CONFIG.marbleRadius * 1.55, 32]} />
-            <meshBasicMaterial
-              color={
-                !isMultiplayerActive
-                  ? '#38bdf8'
-                  : currentTurnPlayerId === localPlayer.id
-                  ? '#10b981'
-                  : '#f59e0b'
-              }
-              transparent
-              opacity={0.7}
-            />
+            <meshBasicMaterial color="#38bdf8" transparent opacity={0.6} />
           </mesh>
         )}
       </group>

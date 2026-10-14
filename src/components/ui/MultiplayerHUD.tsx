@@ -20,6 +20,10 @@ export const MultiplayerHUD: React.FC = () => {
 
   const isGameOver = useGameStore((s) => s.isGameOver);
   const currentScreen = useGameStore((s) => s.currentScreen);
+  const matchPhase = useMultiplayerStore((s) => s.matchPhase);
+  const tossBannerMessage = useMultiplayerStore((s) => s.tossBannerMessage);
+  const turnTimeLimitSeconds = useMultiplayerStore((s) => s.turnTimeLimitSeconds);
+  const turnTimer = useGameStore((s) => s.turnTimer);
 
   // Only show when in game and multiplayer is active
   if (!isMultiplayerActive || currentScreen !== 'PLAYING' || roomStatus !== 'CONNECTED') {
@@ -44,81 +48,126 @@ export const MultiplayerHUD: React.FC = () => {
 
   return (
     <>
-      {/* TOP DUAL-PLAYER SCOREBOARD & TURN INDICATOR */}
+      {/* TOP CONTAINER: ROW 1 (SCOREBOARD) & ROW 2 (TURN STATUS & TIMER) */}
       <div
-        data-testid="multiplayer-hud-bar"
-        className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-4 pointer-events-auto select-none max-w-[95vw]"
+        data-testid="multiplayer-hud-container"
+        className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-auto select-none max-w-[95vw]"
       >
-        {/* P1 Box (Host - Blue) */}
+        {/* ROW 1: DUAL-PLAYER SCOREBOARD BAR */}
         <div
-          data-testid="multiplayer-p1-card"
-          className={`px-3 py-1.5 rounded-2xl border-2 flex items-center gap-2 transition-all shadow-md ${
-            currentTurnPlayerId === (isHost ? localPlayer.id : remotePlayer?.id)
-              ? 'bg-blue-500 border-blue-600 text-white scale-105 ring-2 ring-blue-300'
-              : 'bg-[#fdfbf7]/90 border-stone-300 text-stone-800'
-          }`}
+          data-testid="multiplayer-hud-scoreboard-row"
+          className="flex items-center gap-2 sm:gap-3 bg-[#fdfbf7]/95 border-2 border-[#eee6dc] border-b-[4px] border-b-[#ded4c5] px-3 py-1.5 rounded-2xl shadow-lg backdrop-blur-sm"
         >
-          <div className="w-7 h-7 rounded-full bg-blue-100 border border-blue-400 flex items-center justify-center text-xs font-bold shadow-inner">
-            🔵
-          </div>
-          <div className="flex flex-col">
-            <span className="font-heading font-black text-xs leading-none truncate max-w-[80px] sm:max-w-[100px]">
-              {isHost ? localPlayer.name : remotePlayer?.name || 'Tuan Rumah'}
-            </span>
-            <span className="text-[10px] font-bold opacity-80">Skor: {p1Score}</span>
-          </div>
-        </div>
-
-        {/* Center: Turn Badge & Latency */}
-        <div className="flex flex-col items-center">
+          {/* P1 Box (Host - Blue) */}
           <div
-            data-testid="multiplayer-turn-badge"
-            className={`px-4 py-1.5 rounded-full border-2 font-heading font-black text-xs sm:text-sm tracking-wide shadow-lg flex items-center gap-1.5 transition-all ${
-              isMyTurn
-                ? 'bg-emerald-500 border-emerald-600 text-white animate-pulse'
-                : 'bg-amber-500 border-amber-600 text-white'
+            data-testid="multiplayer-p1-card"
+            className={`px-2.5 py-1 rounded-xl border flex items-center gap-2 transition-all ${
+              currentTurnPlayerId === (isHost ? localPlayer.id : remotePlayer?.id)
+                ? 'bg-blue-600 border-blue-700 text-white font-black shadow-sm'
+                : 'bg-white border-stone-200 text-stone-800'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            <span>{isMyTurn ? 'GILIRANMU!' : 'GILIRAN LAWAN'}</span>
+            <div className="w-6 h-6 rounded-full bg-blue-100 border border-blue-400 flex items-center justify-center text-[11px] font-bold shadow-inner">
+              🔵
+            </div>
+            <div className="flex flex-col">
+              <span className="font-heading font-black text-xs leading-none truncate max-w-[70px] sm:max-w-[100px]">
+                {isHost ? localPlayer.name : remotePlayer?.name || 'Tuan Rumah'}
+              </span>
+              <span className="text-[10px] font-bold opacity-80 leading-tight">Skor: {p1Score}</span>
+            </div>
           </div>
 
-          {pingMs > 0 && (
-            <span className="text-[10px] font-mono font-bold text-stone-600 mt-0.5">
-              ⚡ {pingMs}ms
-            </span>
+          {/* VS Divider */}
+          <div className="font-heading font-black text-stone-400 text-xs px-1">
+            VS
+          </div>
+
+          {/* P2 Box (Guest - Red) */}
+          <div
+            data-testid="multiplayer-p2-card"
+            className={`px-2.5 py-1 rounded-xl border flex items-center gap-2 transition-all ${
+              currentTurnPlayerId === (!isHost ? localPlayer.id : remotePlayer?.id)
+                ? 'bg-red-600 border-red-700 text-white font-black shadow-sm'
+                : 'bg-white border-stone-200 text-stone-800'
+            }`}
+          >
+            <div className="flex flex-col text-right">
+              <span className="font-heading font-black text-xs leading-none truncate max-w-[70px] sm:max-w-[100px]">
+                {!isHost ? localPlayer.name : remotePlayer?.name || 'Lawan'}
+              </span>
+              <span className="text-[10px] font-bold opacity-80 leading-tight">Skor: {p2Score}</span>
+            </div>
+            <div className="w-6 h-6 rounded-full bg-red-100 border border-red-400 flex items-center justify-center text-[11px] font-bold shadow-inner">
+              🔴
+            </div>
+          </div>
+
+          {/* Leave Room Button */}
+          <button
+            data-testid="multiplayer-leave-btn"
+            onClick={handleLeave}
+            title="Keluar dari Kamar"
+            className="w-7 h-7 rounded-lg bg-stone-200 hover:bg-red-500 hover:text-white border border-stone-300 flex items-center justify-center text-stone-600 transition-colors shadow-sm cursor-pointer ml-1"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* ROW 2: TURN STATUS BADGE + TIMER / SANTAI + PING */}
+        <div
+          data-testid="multiplayer-hud-turn-row"
+          className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1"
+        >
+          {matchPhase === 'TOSS_PHASE' ? (
+            <div
+              data-testid="multiplayer-toss-badge"
+              className="px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 border-2 border-amber-600 text-white font-heading font-black text-xs sm:text-sm tracking-wide shadow-md flex items-center gap-2 animate-pulse"
+            >
+              <span>🎯</span>
+              <span>{tossBannerMessage || 'FASE LEMPAR NIAT: Lempar mendekati lingkaran!'}</span>
+            </div>
+          ) : (
+            <>
+              {/* Turn Badge */}
+              <div
+                data-testid="multiplayer-turn-badge"
+                className={`px-3.5 py-1 rounded-full border-2 font-heading font-black text-xs sm:text-sm tracking-wide shadow-md flex items-center gap-1.5 transition-all ${
+                  isMyTurn
+                    ? 'bg-emerald-500 border-emerald-600 text-white animate-pulse'
+                    : 'bg-amber-500 border-amber-600 text-white'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                <span>{isMyTurn ? 'GILIRANMU!' : 'GILIRAN LAWAN'}</span>
+              </div>
+
+              {/* Timer Badge (or Santai) */}
+              <div
+                data-testid="multiplayer-timer-badge"
+                className="px-3 py-1 rounded-full bg-stone-800/90 border border-stone-700 text-white font-heading font-black text-xs shadow-md flex items-center gap-1"
+              >
+                {turnTimeLimitSeconds === null ? (
+                  <span className="text-amber-300">☕ Santai</span>
+                ) : (
+                  <span className={turnTimer !== null && turnTimer <= 5 ? 'text-red-400 animate-pulse font-mono' : 'font-mono'}>
+                    ⏱️ {turnTimer !== null ? `${turnTimer}s` : `${turnTimeLimitSeconds}s`}
+                  </span>
+                )}
+              </div>
+
+              {/* Ping Latency */}
+              {pingMs > 0 && (
+                <div
+                  data-testid="multiplayer-ping-badge"
+                  className="px-2 py-0.5 rounded-full bg-stone-900/60 text-stone-300 font-mono text-[10px] font-bold"
+                >
+                  ⚡ {pingMs}ms
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {/* P2 Box (Guest - Red) */}
-        <div
-          data-testid="multiplayer-p2-card"
-          className={`px-3 py-1.5 rounded-2xl border-2 flex items-center gap-2 transition-all shadow-md ${
-            currentTurnPlayerId === (!isHost ? localPlayer.id : remotePlayer?.id)
-              ? 'bg-red-500 border-red-600 text-white scale-105 ring-2 ring-red-300'
-              : 'bg-[#fdfbf7]/90 border-stone-300 text-stone-800'
-          }`}
-        >
-          <div className="flex flex-col text-right">
-            <span className="font-heading font-black text-xs leading-none truncate max-w-[80px] sm:max-w-[100px]">
-              {!isHost ? localPlayer.name : remotePlayer?.name || 'Lawan'}
-            </span>
-            <span className="text-[10px] font-bold opacity-80">Skor: {p2Score}</span>
-          </div>
-          <div className="w-7 h-7 rounded-full bg-red-100 border border-red-400 flex items-center justify-center text-xs font-bold shadow-inner">
-            🔴
-          </div>
-        </div>
-
-        {/* Leave Room Button */}
-        <button
-          data-testid="multiplayer-leave-btn"
-          onClick={handleLeave}
-          title="Keluar dari Kamar"
-          className="w-8 h-8 rounded-xl bg-stone-200/90 hover:bg-red-500 hover:text-white border border-stone-300 flex items-center justify-center text-stone-700 transition-colors shadow-sm cursor-pointer ml-1"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
       </div>
 
       {/* MATCH OVER MODAL FOR MULTIPLAYER */}

@@ -3,6 +3,13 @@ import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 import { Copy, Check, Users, Sparkles, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
+const TIMER_OPTIONS: { seconds: number | null; label: string; desc: string }[] = [
+  { seconds: 15, label: '15 Detik', desc: 'Kilat' },
+  { seconds: 20, label: '20 Detik', desc: 'Standar' },
+  { seconds: 30, label: '30 Detik', desc: 'Taktis' },
+  { seconds: null, label: '☕ Santai', desc: 'Bebas' },
+];
+
 export const MultiplayerLobbyModal: React.FC = () => {
   const isLobbyModalOpen = useMultiplayerStore((s) => s.isLobbyModalOpen);
   const closeLobbyModal = useMultiplayerStore((s) => s.closeLobbyModal);
@@ -19,6 +26,7 @@ export const MultiplayerLobbyModal: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'HOST' | 'JOIN'>('HOST');
   const [selectedTargetCount, setSelectedTargetCount] = useState<number>(9);
+  const [selectedTimer, setSelectedTimer] = useState<number | null>(20);
   const [inputCode, setInputCode] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [playerNameInput, setPlayerNameInput] = useState<string>(localPlayer.name);
@@ -47,7 +55,7 @@ export const MultiplayerLobbyModal: React.FC = () => {
   const handleStartHosting = async () => {
     marbleAudio.playWoodKnockSound(1.2);
     setLocalPlayerName(playerNameInput);
-    await hostRoom(selectedTargetCount);
+    await hostRoom(selectedTargetCount, selectedTimer);
   };
 
   const handleJoin = async () => {
@@ -248,24 +256,80 @@ export const MultiplayerLobbyModal: React.FC = () => {
                   <label className="text-xs font-heading font-black text-stone-700 mb-1.5 block">
                     JUMLAH KELERENG TARGET DI ARENA:
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[5, 9, 13, 17].map((count) => (
-                      <button
-                        key={count}
-                        type="button"
-                        onClick={() => {
-                          marbleAudio.playWoodKnockSound(1.0);
-                          setSelectedTargetCount(count);
-                        }}
-                        className={`py-2 rounded-xl font-heading font-black text-sm border-2 transition-all cursor-pointer ${
-                          selectedTargetCount === count
-                            ? 'bg-amber-400 border-amber-600 text-amber-950 shadow-md scale-105'
-                            : 'bg-stone-100 border-stone-300 text-stone-700 hover:bg-stone-200'
-                        }`}
-                      >
-                        {count} Bola
-                      </button>
-                    ))}
+                  <div role="radiogroup" aria-label="Jumlah Kelereng Target" className="grid grid-cols-4 gap-2">
+                    {[5, 9, 13, 17].map((count) => {
+                      const isSelected = selectedTargetCount === count;
+                      return (
+                        <button
+                          key={count}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => {
+                            marbleAudio.playWoodKnockSound(1.0);
+                            setSelectedTargetCount(count);
+                          }}
+                          className={`py-2 px-2 rounded-xl text-center border-2 transition-all cursor-pointer flex flex-col items-center justify-between gap-1 ${
+                            isSelected
+                              ? 'bg-amber-100 border-amber-500 border-b-[3px] border-b-amber-700 text-amber-950 font-black shadow-sm ring-2 ring-amber-400/30'
+                              : 'bg-stone-50 border-stone-300 border-b-[3px] border-b-stone-400 text-stone-700 hover:bg-stone-100 font-bold active:translate-y-[1px]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full px-1">
+                            <span className="font-heading font-black text-xs">{count} Bola</span>
+                            <div
+                              className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                isSelected ? 'border-amber-700 bg-white' : 'border-stone-400 bg-stone-200'
+                              }`}
+                            >
+                              {isSelected && <div className="w-1 h-1 rounded-full bg-amber-700" />}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Option Buttons: Batas Waktu Giliran */}
+                <div>
+                  <label className="text-xs font-heading font-black text-stone-700 mb-1.5 block">
+                    BATAS WAKTU GILIRAN (TIMER):
+                  </label>
+                  <div role="radiogroup" aria-label="Batas Waktu Giliran" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {TIMER_OPTIONS.map((opt) => {
+                      const isSelected = selectedTimer === opt.seconds;
+                      return (
+                        <button
+                          key={`lobby-timer-${opt.seconds ?? 'santai'}`}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          data-testid={`lobby-timer-opt-${opt.seconds ?? 'santai'}`}
+                          onClick={() => {
+                            marbleAudio.playWoodKnockSound(1.0);
+                            setSelectedTimer(opt.seconds);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-left border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-emerald-50 border-emerald-500 border-b-[3px] border-b-emerald-700 text-emerald-950 font-black shadow-sm ring-2 ring-emerald-400/30'
+                              : 'bg-stone-50 border-stone-300 border-b-[3px] border-b-stone-400 text-stone-700 hover:bg-stone-100 font-bold active:translate-y-[1px]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <span className="font-heading text-xs font-black">{opt.label}</span>
+                            <div
+                              className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                isSelected ? 'border-emerald-600 bg-white' : 'border-stone-400 bg-stone-200'
+                              }`}
+                            >
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" />}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-stone-500 font-semibold">{opt.desc}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

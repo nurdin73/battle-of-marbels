@@ -14,10 +14,14 @@ import { PekaranganWall } from './PekaranganWall';
 import { PekaranganBenches } from './PekaranganBenches';
 import { SkyEnvironment } from './SkyEnvironment';
 import { LevelObstacles } from './LevelObstacles';
+import { MultiplayerGacoans } from './MultiplayerGacoans';
 import { useGameStore } from '../../store/useGameStore';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 
 export const SceneContainer: React.FC = () => {
   const targetMarbles = useGameStore((s) => s.targetMarbles);
+  const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
+  const matchPhase = useMultiplayerStore((s) => s.matchPhase);
 
   return (
     <div className="w-full h-full relative" data-testid="scene-container">
@@ -42,12 +46,13 @@ export const SceneContainer: React.FC = () => {
             <PekaranganGrass />
             <PekaranganCornerGrass />
             <LevelObstacles />
-            <ShooterMarble />
+            {isMultiplayerActive ? <MultiplayerGacoans /> : <ShooterMarble />}
 
-            {/* Target Marbles Cluster */}
-            {targetMarbles.map((marble) => (
-              <TargetMarble key={marble.id} marble={marble} />
-            ))}
+            {/* Target Marbles Cluster - only render when not in TOSS_PHASE */}
+            {(!isMultiplayerActive || matchPhase !== 'TOSS_PHASE') &&
+              targetMarbles.map((marble) => (
+                <TargetMarble key={marble.id} marble={marble} />
+              ))}
 
             <TrajectoryLine />
           </Physics>

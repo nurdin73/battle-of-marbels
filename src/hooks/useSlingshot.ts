@@ -62,12 +62,19 @@ export function useSlingshot(
 
       const effectiveImpulse = impulseMagnitude * impulseMultiplier;
 
-      const currentPos = storeState.gacoanCurrentPos;
-      const shooterOrigin = {
-        x: currentPos[0],
-        y: currentPos[1],
-        z: currentPos[2],
+      let shooterOrigin = {
+        x: storeState.gacoanCurrentPos[0],
+        y: storeState.gacoanCurrentPos[1],
+        z: storeState.gacoanCurrentPos[2],
       };
+      if (rigidBodyRef.current) {
+        const trans = rigidBodyRef.current.translation();
+        shooterOrigin = {
+          x: trans.x,
+          y: trans.y,
+          z: trans.z,
+        };
+      }
 
       const activeTargets = storeState.targetMarbles
         .filter((m) => !storeState.marblesOutsideRing.includes(m.id))
@@ -134,22 +141,40 @@ export function useSlingshot(
       // If multiplayer mode is active, broadcast shot to peer
       const multiplayerStore = useMultiplayerStore.getState();
       if (multiplayerStore.isMultiplayerActive) {
-        multiplayerStore.broadcastShot({
-          turnIndex: storeState.turnCount,
-          playerId: multiplayerStore.localPlayer.id,
-          timestamp: Date.now(),
-          impulse: {
-            x: normX * effectiveImpulse,
-            y: 0.0,
-            z: normZ * effectiveImpulse,
-          },
-          originPosition: {
-            x: shooterOrigin.x,
-            y: shooterOrigin.y,
-            z: shooterOrigin.z,
-          },
-          appliedCardId: activeCard?.id,
-        });
+        if (multiplayerStore.matchPhase === 'TOSS_PHASE') {
+          multiplayerStore.broadcastTossShot({
+            turnIndex: 0,
+            playerId: multiplayerStore.localPlayer.id,
+            timestamp: Date.now(),
+            impulse: {
+              x: normX * effectiveImpulse,
+              y: 0.0,
+              z: normZ * effectiveImpulse,
+            },
+            originPosition: {
+              x: shooterOrigin.x,
+              y: shooterOrigin.y,
+              z: shooterOrigin.z,
+            },
+          });
+        } else {
+          multiplayerStore.broadcastShot({
+            turnIndex: storeState.turnCount,
+            playerId: multiplayerStore.localPlayer.id,
+            timestamp: Date.now(),
+            impulse: {
+              x: normX * effectiveImpulse,
+              y: 0.0,
+              z: normZ * effectiveImpulse,
+            },
+            originPosition: {
+              x: shooterOrigin.x,
+              y: shooterOrigin.y,
+              z: shooterOrigin.z,
+            },
+            appliedCardId: activeCard?.id,
+          });
+        }
       }
 
       // Consume active card after successful flick release
@@ -181,17 +206,37 @@ export function useSlingshot(
 
   const onPointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      // Only allow aiming when game is active (PLAYING) and IDLE
-      if (currentScreen !== 'PLAYING' || aimingState !== 'IDLE') return;
+      // Only allow aiming when game is active (PLAYING)
+      if (currentScreen !== 'PLAYING') return;
 
-      // In multiplayer mode, only allow aiming if it is the local player's turn
       const multiplayerStore = useMultiplayerStore.getState();
+      const isMultiplayerToss = multiplayerStore.isMultiplayerActive && multiplayerStore.matchPhase === 'TOSS_PHASE';
+
+      // In non-toss phase, require aimingState to be strictly IDLE
+      if (!isMultiplayerToss && aimingState !== 'IDLE') return;
+
+      // In multiplayer mode, validate turn or toss phase eligibility
       if (multiplayerStore.isMultiplayerActive) {
-        const isMyTurn = multiplayerStore.currentTurnPlayerId === multiplayerStore.localPlayer.id;
-        if (!isMyTurn) {
-          marbleAudio.playWoodKnockSound(0.8);
-          return;
+        if (multiplayerStore.matchPhase === 'TOSS_PHASE') {
+          const isP1 = multiplayerStore.role === 'HOST';
+          const alreadyTossed = isP1 ? multiplayerStore.tossShotDoneP1 : multiplayerStore.tossShotDoneP2;
+          if (alreadyTossed) {
+            marbleAudio.playWoodKnockSound(0.8);
+            return;
+          }
+        } else {
+          const isMyTurn = multiplayerStore.currentTurnPlayerId === multiplayerStore.localPlayer.id;
+          if (!isMyTurn) {
+            marbleAudio.playWoodKnockSound(0.8);
+            return;
+          }
         }
+      }
+
+      // Synchronize active marble position to game store for accurate camera & trajectory line
+      if (rigidBodyRef.current) {
+        const trans = rigidBodyRef.current.translation();
+        useGameStore.setState({ gacoanCurrentPos: [trans.x, trans.y, trans.z] });
       }
 
       e.stopPropagation();
@@ -199,7 +244,7 @@ export function useSlingshot(
       setIsDragging(true);
       setAimingState('AIMING');
     },
-    [currentScreen, aimingState, setAimingState]
+    [currentScreen, aimingState, setAimingState, rigidBodyRef]
   );
 
   // Global window pointer listeners to seamlessly track drags across the entire screen

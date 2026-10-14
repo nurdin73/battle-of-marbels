@@ -15,11 +15,22 @@ const PRESET_COUNTS = [
   { count: 17, label: '17 Butir', desc: 'Perang Akbar' },
 ];
 
+const TIMER_OPTIONS: { seconds: number | null; label: string; desc: string }[] = [
+  { seconds: 15, label: '15 Detik', desc: 'Kilat' },
+  { seconds: 20, label: '20 Detik', desc: 'Standar' },
+  { seconds: 30, label: '30 Detik', desc: 'Taktis' },
+  { seconds: null, label: '☕ Santai', desc: 'Tanpa Waktu' },
+];
+
 export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({ isOpen, onClose }) => {
   const currentCount = useGameStore((s) => s.customMarbleCount);
+  const currentTimeLimit = useGameStore((s) => s.turnTimeLimitSeconds);
   const startMatchWithMarbleCount = useGameStore((s) => s.startMatchWithMarbleCount);
 
   const [selectedCount, setSelectedCount] = useState<number>(currentCount || 9);
+  const [selectedTimer, setSelectedTimer] = useState<number | null>(
+    currentTimeLimit !== undefined ? currentTimeLimit : 20
+  );
 
   if (!isOpen) return null;
 
@@ -42,10 +53,15 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({ isOpen, onClos
     setSelectedCount(count);
   };
 
+  const handleSelectTimer = (seconds: number | null) => {
+    marbleAudio.playWoodKnockSound(1.0);
+    setSelectedTimer(seconds);
+  };
+
   const handleStartMatch = () => {
     marbleAudio.playStoneClackSound(1.4);
     onClose();
-    startMatchWithMarbleCount(selectedCount);
+    startMatchWithMarbleCount(selectedCount, selectedTimer);
   };
 
   return (
@@ -133,7 +149,7 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({ isOpen, onClos
         {/* Quick Selection Presets */}
         <div className="flex flex-col gap-2">
           <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider">
-            Pilihan Cepat (Preset)
+            Pilihan Cepat Kelereng
           </span>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {PRESET_COUNTS.map((preset) => {
@@ -150,6 +166,45 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({ isOpen, onClos
                 >
                   <span className="block font-heading text-xs font-black">{preset.label}</span>
                   <span className="block text-[10px] text-stone-400 font-semibold">{preset.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Turn Timer Option Buttons */}
+        <div className="flex flex-col gap-2">
+          <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider">
+            Batas Waktu Giliran (Timer)
+          </span>
+          <div role="radiogroup" aria-label="Batas Waktu Giliran" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TIMER_OPTIONS.map((opt) => {
+              const isSelected = selectedTimer === opt.seconds;
+              return (
+                <button
+                  key={`timer-${opt.seconds ?? 'null'}`}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  data-testid={`match-timer-opt-${opt.seconds ?? 'santai'}`}
+                  onClick={() => handleSelectTimer(opt.seconds)}
+                  className={`py-2 px-2.5 rounded-xl text-left border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-emerald-50 border-emerald-500 border-b-[3px] border-b-emerald-700 text-emerald-950 font-black shadow-sm ring-2 ring-emerald-400/30'
+                      : 'bg-white border-[#eee6dc] border-b-[3px] border-b-[#ded4c5] text-stone-600 font-bold hover:bg-stone-50 active:translate-y-[1px]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className="font-heading text-xs font-black">{opt.label}</span>
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                        isSelected ? 'border-emerald-600 bg-white' : 'border-stone-300 bg-stone-100'
+                      }`}
+                    >
+                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" />}
+                    </div>
+                  </div>
+                  <span className="block text-[10px] text-stone-400 font-semibold">{opt.desc}</span>
                 </button>
               );
             })}

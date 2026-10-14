@@ -34,7 +34,8 @@ interface GameStoreState {
   flickCount: number;
   turnCount: number;
   comboStreak: number;
-  turnTimer: number;
+  turnTimeLimitSeconds: number | null;
+  turnTimer: number | null;
   isTimerActive: boolean;
   isGameOver: boolean;
   starsAwarded: number;
@@ -54,7 +55,8 @@ interface GameStoreState {
   // Actions
   startGame: () => void;
   goToMainMenu: () => void;
-  startMatchWithMarbleCount: (count: number) => void;
+  setTurnTimeLimit: (seconds: number | null) => void;
+  startMatchWithMarbleCount: (count: number, timeLimit?: number | null) => void;
   loadLevelConfig: (level: import('../types/level.types').LevelConfig) => void;
   setAimingState: (state: AimingState) => void;
   setLockedDirection: (dir: { x: number; z: number } | null) => void;
@@ -149,6 +151,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   flickCount: 0,
   turnCount: 1,
   comboStreak: 0,
+  turnTimeLimitSeconds: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
   turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
   isTimerActive: false,
   isGameOver: false,
@@ -167,10 +170,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   launchTriggerCallback: null,
 
   startGame: () => {
+    const limit = get().turnTimeLimitSeconds;
     set({
       currentScreen: 'PLAYING',
-      isTimerActive: true,
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+      isTimerActive: limit !== null,
+      turnTimer: limit,
       aimingState: 'IDLE',
       isGameOver: false,
       lockedDirection: null,
@@ -178,9 +182,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
 
-  startMatchWithMarbleCount: (count: number) => {
+  setTurnTimeLimit: (seconds: number | null) =>
+    set({
+      turnTimeLimitSeconds: seconds,
+      turnTimer: seconds,
+      isTimerActive: seconds !== null,
+    }),
+
+  startMatchWithMarbleCount: (count: number, timeLimit?: number | null) => {
     useCardStore.getState().resetCardStore();
     const targets = createTargetMarblesByCount(count);
+    const effectiveLimit = timeLimit !== undefined ? timeLimit : get().turnTimeLimitSeconds;
     set((state) => ({
       customMarbleCount: count,
       targetMarbles: targets,
@@ -199,8 +211,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       flickCount: 0,
       turnCount: 1,
       comboStreak: 0,
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: true,
+      turnTimeLimitSeconds: effectiveLimit,
+      turnTimer: effectiveLimit,
+      isTimerActive: effectiveLimit !== null,
       isGameOver: false,
       starsAwarded: 0,
       lastTurnOutcome: null,
@@ -317,7 +330,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   tickTimer: () => {
     const { turnTimer, isTimerActive, aimingState, handleTurnTimeout } = get();
-    if (!isTimerActive || (aimingState !== 'IDLE' && aimingState !== 'AIMING' && aimingState !== 'CHARGING')) return;
+    if (!isTimerActive || turnTimer === null || (aimingState !== 'IDLE' && aimingState !== 'AIMING' && aimingState !== 'CHARGING')) return;
 
     if (turnTimer <= 1) {
       handleTurnTimeout();
@@ -331,18 +344,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ turnTimer: nextTime });
   },
 
-  resetTurnTimer: () =>
+  resetTurnTimer: () => {
+    const limit = get().turnTimeLimitSeconds;
     set({
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: true,
-    }),
+      turnTimer: limit,
+      isTimerActive: limit !== null,
+    });
+  },
 
   handleTurnTimeout: () => {
     marbleAudio.playFoulSound();
     useCardStore.getState().regenerateChalk(1);
+    const limit = get().turnTimeLimitSeconds;
     set((state) => ({
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: true,
+      turnTimer: limit,
+      isTimerActive: limit !== null,
       comboStreak: 0,
       turnCount: state.turnCount + 1,
       drag: { vector: { x: 0, z: 0 }, distance: 0, percentage: 0 },
@@ -351,56 +367,28 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         resultType: 'TIMEOUT',
         targetsPocketed: 0,
         gacoanFouled: false,
-        message: 'WAKTU HABIS! Batas 20 detik terlewati.',
+        message: 'WAKTU HABIS! Giliran berpindah.',
       },
     }));
   },
 
   evaluateTurnOutcome: (gacoanPos) => {
     const state = get();
-    const gacoanDist = Math.hypot(gacoanPos[0], gacoanPos[2]);
-    const isGacoanFouled = gacoanDist > ARENA_CONFIG.ringRadius + ARENA_CONFIG.marbleRadius;
     const targetsPocketedIds = state.targetsPocketedThisTurnIds;
     const targetsPocketedCount = targetsPocketedIds.length;
 
     let resultOutcome: TurnEvaluationOutcome;
     let nextComboStreak = 0;
-    let nextGacoanPos = gacoanPos;
+    // Game CONTINUES: Player shoots next from wherever the gacoan stopped
+    const nextGacoanPos: [number, number, number] = gacoanPos;
     let finalScore = state.score;
     let nextMarblesOutside = state.marblesOutsideRing;
-    let nextFoulRestoredIds: string[] = [];
-    let nextFoulRestoreRevision = state.foulRestoreRevision;
 
-    if (isGacoanFouled) {
-      // FOUL: Player marble flew out of the ring
-      marbleAudio.playFoulSound();
-      nextComboStreak = 0;
-      nextGacoanPos = GAMEPLAY_CONFIG.foulResetPosition;
-
-      if (targetsPocketedCount > 0) {
-        // Rollback: Cancel score and return all target marbles that were knocked out during this foul turn
-        finalScore = Math.max(0, state.score - targetsPocketedCount);
-        nextMarblesOutside = state.marblesOutsideRing.filter((id) => !targetsPocketedIds.includes(id));
-        nextFoulRestoredIds = [...targetsPocketedIds];
-        nextFoulRestoreRevision = state.foulRestoreRevision + 1;
-
-        resultOutcome = {
-          resultType: 'FOUL_OUT_OF_BOUNDS',
-          targetsPocketed: 0,
-          gacoanFouled: true,
-          message: `FOUL! Gacoan keluar ring. ${targetsPocketedCount} kelereng target dikembalikan ke posisi semula!`,
-        };
-      } else {
-        resultOutcome = {
-          resultType: 'FOUL_OUT_OF_BOUNDS',
-          targetsPocketed: 0,
-          gacoanFouled: true,
-          message: 'FOUL! Gacoan terpental keluar arena! Posisi gacoan di-reset.',
-        };
-      }
-    } else if (targetsPocketedCount > 0) {
-      // COMBO: Valid shot, knocked out target marble(s)
+    if (targetsPocketedCount > 0) {
+      // COMBO: Valid shot knocked out target marble(s)!
       marbleAudio.playComboSound();
+      finalScore = state.score + targetsPocketedCount;
+      nextMarblesOutside = Array.from(new Set([...state.marblesOutsideRing, ...targetsPocketedIds]));
       nextComboStreak = state.comboStreak + 1;
       resultOutcome = {
         resultType: 'COMBO_EXTRA_TURN',
@@ -409,13 +397,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         message: `KOMBO SENTILAN! +${targetsPocketedCount} Kelereng Keluar! Dapat Giliran Tambahan!`,
       };
     } else {
-      // Normal Shot without score
+      // Normal Shot without score - Gacoan stays at resting position
       nextComboStreak = 0;
       resultOutcome = {
         resultType: 'NORMAL_SHOT',
         targetsPocketed: 0,
         gacoanFouled: false,
-        message: 'Sentilan Sah. Gacoan bertahan di dalam arena.',
+        message: 'Sentilan Sah. Menembak dari titik berhenti.',
       };
     }
 
@@ -438,16 +426,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       }
     }
 
+    const timerLimit = state.turnTimeLimitSeconds;
+
     set({
       score: finalScore,
       marblesOutsideRing: nextMarblesOutside,
-      foulRestoredIds: nextFoulRestoredIds,
-      foulRestoreRevision: nextFoulRestoreRevision,
+      foulRestoredIds: [],
       lastTurnOutcome: resultOutcome,
       comboStreak: nextComboStreak,
       gacoanCurrentPos: nextGacoanPos,
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: !isGameOver,
+      turnTimer: timerLimit,
+      isTimerActive: !isGameOver && timerLimit !== null,
       isGameOver,
       starsAwarded,
       targetsPocketedThisTurn: 0,

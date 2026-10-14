@@ -1,18 +1,25 @@
 import { create } from 'zustand';
 import {
+  MatchPhase,
   PlayerInfo,
   PlayerRole,
   RestStatePayload,
   RoomStatus,
   ShotNetworkPayload,
+  TossResultPayload,
 } from '../types/multiplayer.types';
 import { peerService, PeerService } from '../services/peerService';
-import { useGameStore } from './useGameStore';
+import { useGameStore, createTargetMarblesByCount } from './useGameStore';
 import { marbleAudio } from '../utils/soundSynth.utils';
+import { ARENA_CONFIG } from '../constants/physics.constants';
+
+const INITIAL_P1_POS: [number, number, number] = [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
+const INITIAL_P2_POS: [number, number, number] = [0.25, ARENA_CONFIG.marbleRadius, 2.3];
 
 interface MultiplayerStoreState {
   isMultiplayerActive: boolean;
   roomStatus: RoomStatus;
+  matchPhase: MatchPhase;
   roomCode: string;
   errorMessage: string | null;
   role: PlayerRole | null;
@@ -21,27 +28,43 @@ interface MultiplayerStoreState {
   currentTurnPlayerId: string | null;
   scores: { host: number; guest: number };
   targetCount: number;
+  turnTimeLimitSeconds: number | null;
   pingMs: number;
   isLobbyModalOpen: boolean;
   rematchRequestedBy: string | null;
 
+  // Independent Gacoan positions
+  gacoanP1Pos: [number, number, number];
+  gacoanP2Pos: [number, number, number];
+
+  // Toss Phase (Nimbang / Lempar Niat) state
+  tossShotDoneP1: boolean;
+  tossShotDoneP2: boolean;
+  tossResult: TossResultPayload | null;
+  tossBannerMessage: string | null;
+
   // Remote listeners
   onRemoteShotReceived: ((payload: ShotNetworkPayload) => void) | null;
   onRemoteRestStateReceived: ((payload: RestStatePayload) => void) | null;
+  onRemoteTossReceived: ((payload: ShotNetworkPayload) => void) | null;
 
   // Actions
   openLobbyModal: () => void;
   closeLobbyModal: () => void;
   setLocalPlayerName: (name: string) => void;
-  hostRoom: (targetCount?: number) => Promise<void>;
+  hostRoom: (targetCount?: number, timeLimit?: number | null) => Promise<void>;
   joinRoom: (code: string) => Promise<void>;
   leaveRoom: () => void;
   broadcastShot: (payload: ShotNetworkPayload) => void;
+  broadcastTossShot: (payload: ShotNetworkPayload) => void;
   broadcastRestState: (payload: RestStatePayload) => void;
+  updateGacoanP1Pos: (pos: [number, number, number]) => void;
+  updateGacoanP2Pos: (pos: [number, number, number]) => void;
   requestRematch: () => void;
   acceptRematch: () => void;
   setRemoteShotListener: (cb: ((payload: ShotNetworkPayload) => void) | null) => void;
   setRemoteRestStateListener: (cb: ((payload: RestStatePayload) => void) | null) => void;
+  setRemoteTossListener: (cb: ((payload: ShotNetworkPayload) => void) | null) => void;
 }
 
 const DEFAULT_LOCAL_HOST: PlayerInfo = {
@@ -70,13 +93,21 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         // Guest receives init from Host
         set({
           targetCount: msg.payload.targetCount,
+          turnTimeLimitSeconds: msg.payload.turnTimeLimitSeconds,
           remotePlayer: msg.payload.hostPlayer,
-          currentTurnPlayerId: msg.payload.hostPlayer.id, // Host starts first
+          matchPhase: 'TOSS_PHASE',
+          tossShotDoneP1: false,
+          tossShotDoneP2: false,
+          tossResult: null,
+          tossBannerMessage: 'FASE LEMPAR NIAT: Lempar gacoan mendekati lingkaran!',
+          gacoanP1Pos: INITIAL_P1_POS,
+          gacoanP2Pos: INITIAL_P2_POS,
           scores: { host: 0, guest: 0 },
         });
 
-        // Initialize game arena with the agreed target count on Guest
-        useGameStore.getState().startMatchWithMarbleCount(msg.payload.targetCount);
+        // Initialize game arena with the exact target marbles & timer from Host
+        useGameStore.getState().startMatchWithMarbleCount(msg.payload.targetCount, msg.payload.turnTimeLimitSeconds);
+        useGameStore.setState({ targetMarbles: msg.payload.initialTargetMarbles });
 
         // Send back guest info
         peerService.sendMessage({
@@ -87,20 +118,60 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }
 
       case 'MATCH_START': {
-        // Host receives guest player info
+        // Host receives guest player info -> both enter TOSS_PHASE!
         set({
           remotePlayer: msg.payload.guestPlayer,
-          currentTurnPlayerId: state.localPlayer.id,
+          matchPhase: 'TOSS_PHASE',
+          tossShotDoneP1: false,
+          tossShotDoneP2: false,
+          tossResult: null,
+          tossBannerMessage: 'FASE LEMPAR NIAT: Lempar gacoan mendekati lingkaran!',
+          gacoanP1Pos: INITIAL_P1_POS,
+          gacoanP2Pos: INITIAL_P2_POS,
           scores: { host: 0, guest: 0 },
         });
 
         // Initialize game arena on Host
-        useGameStore.getState().startMatchWithMarbleCount(state.targetCount);
+        useGameStore.getState().startMatchWithMarbleCount(state.targetCount, state.turnTimeLimitSeconds);
+        break;
+      }
+
+      case 'TOSS_SHOT': {
+        // Opponent threw their toss shot
+        marbleAudio.playLaunchSound(0.7);
+        if (state.role === 'HOST') {
+          set({ tossShotDoneP2: true });
+        } else {
+          set({ tossShotDoneP1: true });
+        }
+        if (state.onRemoteTossReceived) {
+          state.onRemoteTossReceived(msg.payload);
+        }
+        break;
+      }
+
+      case 'TOSS_RESULT': {
+        // Guest receives authoritative toss evaluation from Host
+        const winnerName = msg.payload.firstTurnPlayerId === state.localPlayer.id ? 'KAMU' : 'LAWAN';
+
+        set({
+          matchPhase: 'PLAYING',
+          currentTurnPlayerId: msg.payload.firstTurnPlayerId,
+          tossResult: msg.payload,
+          tossBannerMessage: `🎉 ${winnerName} LEBIH DEKAT! (${msg.payload.p1Distance.toFixed(2)}m vs ${msg.payload.p2Distance.toFixed(2)}m) — GILIRAN PERTAMA!`,
+        });
+
+        marbleAudio.playComboSound();
+
+        // Clear banner message after 3.5s
+        setTimeout(() => {
+          set({ tossBannerMessage: null });
+        }, 3500);
         break;
       }
 
       case 'SHOT_FIRED': {
-        // Opponent fired a shot!
+        // Opponent fired an official match shot!
         marbleAudio.playLaunchSound(0.9);
         if (state.onRemoteShotReceived) {
           state.onRemoteShotReceived(msg.payload);
@@ -113,7 +184,16 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         set({
           scores: msg.payload.scores,
           currentTurnPlayerId: msg.payload.nextTurnPlayerId,
+          gacoanP1Pos: msg.payload.gacoanP1Position,
+          gacoanP2Pos: msg.payload.gacoanP2Position,
         });
+
+        // Reconcile marbles in game store
+        useGameStore.setState({
+          marblesOutsideRing: msg.payload.marblesOutsideRing,
+          targetLivePositions: msg.payload.targetPositions,
+        });
+
         if (state.onRemoteRestStateReceived) {
           state.onRemoteRestStateReceived(msg.payload);
         }
@@ -126,14 +206,20 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }
 
       case 'REMATCH_ACCEPT': {
-        // Reset match
-        const isHost = state.role === 'HOST';
+        // Reset match to Toss Phase again
         set({
           rematchRequestedBy: null,
+          matchPhase: 'TOSS_PHASE',
+          tossShotDoneP1: false,
+          tossShotDoneP2: false,
+          tossResult: null,
+          tossBannerMessage: 'FASE LEMPAR NIAT: Lempar gacoan mendekati lingkaran!',
           scores: { host: 0, guest: 0 },
-          currentTurnPlayerId: isHost ? state.localPlayer.id : state.remotePlayer?.id || null,
+          gacoanP1Pos: INITIAL_P1_POS,
+          gacoanP2Pos: INITIAL_P2_POS,
+          currentTurnPlayerId: null,
         });
-        useGameStore.getState().startMatchWithMarbleCount(state.targetCount);
+        useGameStore.getState().startMatchWithMarbleCount(state.targetCount, state.turnTimeLimitSeconds);
         break;
       }
     }
@@ -144,15 +230,18 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     const state = get();
     if (connected) {
       set({ roomStatus: 'CONNECTED', errorMessage: null });
-      // If we are Host, send MATCH_INIT
+      // If we are Host, send MATCH_INIT with initialTargetMarbles
       if (state.role === 'HOST') {
+        const initialTargets = createTargetMarblesByCount(state.targetCount);
         peerService.sendMessage({
           type: 'MATCH_INIT',
           payload: {
             roomId: state.roomCode,
             randomSeed: Math.floor(Math.random() * 1000000),
             targetCount: state.targetCount,
+            turnTimeLimitSeconds: state.turnTimeLimitSeconds,
             hostPlayer: state.localPlayer,
+            initialTargetMarbles: initialTargets,
           },
         });
       }
@@ -176,6 +265,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
   return {
     isMultiplayerActive: false,
     roomStatus: 'IDLE',
+    matchPhase: 'LOBBY',
     roomCode: '',
     errorMessage: null,
     role: null,
@@ -184,11 +274,19 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
     currentTurnPlayerId: null,
     scores: { host: 0, guest: 0 },
     targetCount: 9,
+    turnTimeLimitSeconds: 20,
     pingMs: 0,
     isLobbyModalOpen: false,
     rematchRequestedBy: null,
+    gacoanP1Pos: INITIAL_P1_POS,
+    gacoanP2Pos: INITIAL_P2_POS,
+    tossShotDoneP1: false,
+    tossShotDoneP2: false,
+    tossResult: null,
+    tossBannerMessage: null,
     onRemoteShotReceived: null,
     onRemoteRestStateReceived: null,
+    onRemoteTossReceived: null,
 
     openLobbyModal: () => set({ isLobbyModalOpen: true, errorMessage: null }),
     closeLobbyModal: () => set({ isLobbyModalOpen: false }),
@@ -200,7 +298,7 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }));
     },
 
-    hostRoom: async (targetCount = 9) => {
+    hostRoom: async (targetCount = 9, timeLimit = 20) => {
       const code = PeerService.generateRoomCode();
       const hostPlayer: PlayerInfo = {
         ...DEFAULT_LOCAL_HOST,
@@ -210,14 +308,18 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       set({
         isMultiplayerActive: true,
         roomStatus: 'HOSTING',
+        matchPhase: 'LOBBY',
         roomCode: code,
         role: 'HOST',
         targetCount,
+        turnTimeLimitSeconds: timeLimit,
         localPlayer: hostPlayer,
         remotePlayer: null,
         errorMessage: null,
         scores: { host: 0, guest: 0 },
-        currentTurnPlayerId: hostPlayer.id,
+        gacoanP1Pos: INITIAL_P1_POS,
+        gacoanP2Pos: INITIAL_P2_POS,
+        currentTurnPlayerId: null,
       });
 
       try {
@@ -245,11 +347,14 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       set({
         isMultiplayerActive: true,
         roomStatus: 'CONNECTING',
+        matchPhase: 'LOBBY',
         roomCode: cleanCode,
         role: 'GUEST',
         localPlayer: guestPlayer,
         remotePlayer: null,
         errorMessage: null,
+        gacoanP1Pos: INITIAL_P1_POS,
+        gacoanP2Pos: INITIAL_P2_POS,
       });
 
       try {
@@ -267,14 +372,30 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       set({
         isMultiplayerActive: false,
         roomStatus: 'IDLE',
+        matchPhase: 'LOBBY',
         roomCode: '',
         role: null,
         remotePlayer: null,
         errorMessage: null,
         scores: { host: 0, guest: 0 },
         currentTurnPlayerId: null,
+        tossResult: null,
+        tossBannerMessage: null,
       });
       useGameStore.getState().goToMainMenu();
+    },
+
+    broadcastTossShot: (payload: ShotNetworkPayload) => {
+      const state = get();
+      if (state.role === 'HOST') {
+        set({ tossShotDoneP1: true });
+      } else {
+        set({ tossShotDoneP2: true });
+      }
+      peerService.sendMessage({
+        type: 'TOSS_SHOT',
+        payload,
+      });
     },
 
     broadcastShot: (payload: ShotNetworkPayload) => {
@@ -288,12 +409,17 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       set({
         scores: payload.scores,
         currentTurnPlayerId: payload.nextTurnPlayerId,
+        gacoanP1Pos: payload.gacoanP1Position,
+        gacoanP2Pos: payload.gacoanP2Position,
       });
       peerService.sendMessage({
         type: 'REST_STATE_SYNC',
         payload,
       });
     },
+
+    updateGacoanP1Pos: (pos) => set({ gacoanP1Pos: pos }),
+    updateGacoanP2Pos: (pos) => set({ gacoanP2Pos: pos }),
 
     requestRematch: () => {
       const localId = get().localPlayer.id;
@@ -307,16 +433,23 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       peerService.sendMessage({
         type: 'REMATCH_ACCEPT',
       });
-      const isHost = get().role === 'HOST';
       set({
         rematchRequestedBy: null,
+        matchPhase: 'TOSS_PHASE',
+        tossShotDoneP1: false,
+        tossShotDoneP2: false,
+        tossResult: null,
+        tossBannerMessage: 'FASE LEMPAR NIAT: Lempar gacoan mendekati lingkaran!',
         scores: { host: 0, guest: 0 },
-        currentTurnPlayerId: isHost ? get().localPlayer.id : get().remotePlayer?.id || null,
+        gacoanP1Pos: INITIAL_P1_POS,
+        gacoanP2Pos: INITIAL_P2_POS,
+        currentTurnPlayerId: null,
       });
-      useGameStore.getState().startMatchWithMarbleCount(get().targetCount);
+      useGameStore.getState().startMatchWithMarbleCount(get().targetCount, get().turnTimeLimitSeconds);
     },
 
     setRemoteShotListener: (cb) => set({ onRemoteShotReceived: cb }),
     setRemoteRestStateListener: (cb) => set({ onRemoteRestStateReceived: cb }),
+    setRemoteTossListener: (cb) => set({ onRemoteTossReceived: cb }),
   };
 });

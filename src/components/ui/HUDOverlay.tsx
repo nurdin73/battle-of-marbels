@@ -8,9 +8,11 @@ import { CardDeckOverlay } from './CardDeckOverlay';
 import { LevelSelectModal } from './LevelSelectModal';
 import { GameMenuDrawer } from './GameMenuDrawer';
 import { HelpModal } from './HelpModal';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { Menu } from 'lucide-react';
 
 export const HUDOverlay: React.FC = () => {
+  const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
@@ -61,9 +63,9 @@ export const HUDOverlay: React.FC = () => {
             <span className="hidden sm:inline">Menu</span>
           </button>
 
-          {/* Center: Sisa Waktu Turn Timer */}
+          {/* Center: Sisa Waktu Turn Timer (solo mode only) */}
           <div className="flex items-center justify-center">
-            <TurnTimer />
+            {!isMultiplayerActive && <TurnTimer />}
           </div>
 
           {/* Right: Eye, Sound, Reset & Help (?) Controls */}

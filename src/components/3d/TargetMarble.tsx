@@ -26,6 +26,32 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
   const foulRestoreRevision = useGameStore((s) => s.foulRestoreRevision);
   const foulRestoredIds = useGameStore((s) => s.foulRestoredIds);
   const preShotTargetPositions = useGameStore((s) => s.preShotTargetPositions);
+  const targetLivePositions = useGameStore((s) => s.targetLivePositions);
+  const marblesOutsideRing = useGameStore((s) => s.marblesOutsideRing);
+
+  // Sync collected state if marble is marked outside ring in store
+  useEffect(() => {
+    if (marblesOutsideRing.includes(marble.id) && !isCollected) {
+      isOutsideRef.current = true;
+      setIsCollected(true);
+      if (rigidBodyRef.current) {
+        rigidBodyRef.current.setEnabled(false);
+      }
+    }
+  }, [marblesOutsideRing, marble.id, isCollected]);
+
+  // Reconcile live position from network store (Guest synchronizes to Host authoritative coordinates)
+  useEffect(() => {
+    const remotePos = targetLivePositions[marble.id];
+    if (remotePos && rigidBodyRef.current && !isCollected) {
+      const cur = rigidBodyRef.current.translation();
+      const diff = Math.hypot(cur.x - remotePos[0], cur.z - remotePos[2]);
+      if (diff > 0.03) {
+        rigidBodyRef.current.setTranslation({ x: remotePos[0], y: remotePos[1], z: remotePos[2] }, true);
+        rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+    }
+  }, [targetLivePositions, marble.id, isCollected]);
 
   // Reset position, scale, and physics when arena is reset
   useEffect(() => {
