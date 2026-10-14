@@ -9,6 +9,7 @@ import { TrajectoryLine } from './TrajectoryLine';
 import { CameraController } from './CameraController';
 import { PekaranganProps } from './PekaranganProps';
 import { PekaranganGrass } from './PekaranganGrass';
+import { PekaranganCornerGrass } from './PekaranganCornerGrass';
 import { PekaranganWall } from './PekaranganWall';
 import { SkyEnvironment } from './SkyEnvironment';
 import { LevelObstacles } from './LevelObstacles';
@@ -37,6 +38,7 @@ export const SceneContainer: React.FC = () => {
             <PekaranganWall />
             <PekaranganProps />
             <PekaranganGrass />
+            <PekaranganCornerGrass />
             <LevelObstacles />
             <ShooterMarble />
 
