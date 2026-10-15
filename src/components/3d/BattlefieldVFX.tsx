@@ -26,6 +26,7 @@ export const BattlefieldVFX: React.FC = () => {
   const magneticLinesRef = useRef<THREE.LineSegments>(null);
   const lastSpawnTimeRef = useRef<number>(0);
   const lastCollisionHandledRef = useRef<number>(0);
+  const simDurationRef = useRef<number>(0);
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
@@ -148,9 +149,19 @@ export const BattlefieldVFX: React.FC = () => {
       }
     }
 
-    // 4. Update Magnetic Attraction Arc Lines
+    // 4. Update Magnetic Attraction Arc Lines (active for exactly 1.2s after flick, then cleared)
     if (magneticLinesRef.current) {
-      if (activeTurnCard?.id === 'CARD_MAGNETIC' && aimingState === 'SIMULATING') {
+      if (aimingState === 'SIMULATING') {
+        simDurationRef.current += delta;
+      } else {
+        simDurationRef.current = 0;
+      }
+
+      if (
+        activeTurnCard?.id === 'CARD_MAGNETIC' &&
+        aimingState === 'SIMULATING' &&
+        simDurationRef.current <= 1.2
+      ) {
         const lineGeo = magneticLinesRef.current.geometry;
         const positions: number[] = [];
         const bodies = getAllTargetBodies();
@@ -158,9 +169,12 @@ export const BattlefieldVFX: React.FC = () => {
         for (const body of bodies.values()) {
           try {
             const trans = body.translation();
-            const dist = Math.hypot(gacoanPos[0] - trans.x, gacoanPos[2] - trans.z);
-            if (dist < 1.35) {
-              // Draw arc segment from gacoan to attracted target marble
+            const toTargetX = trans.x - gacoanPos[0];
+            const toTargetZ = trans.z - gacoanPos[2];
+            const dist = Math.hypot(toTargetX, toTargetZ);
+
+            if (dist > 0.28 && dist <= 0.8) {
+              // Draw arc line segment from gacoan to attracted target marble
               positions.push(gacoanPos[0], gacoanPos[1] + 0.04, gacoanPos[2]);
               positions.push(trans.x, trans.y + 0.04, trans.z);
             }
@@ -175,6 +189,14 @@ export const BattlefieldVFX: React.FC = () => {
         );
         magneticLinesRef.current.visible = positions.length > 0;
       } else {
+        // Clear lines when duration elapsed or inactive
+        const lineGeo = magneticLinesRef.current.geometry;
+        if (lineGeo.getAttribute('position')?.count > 0) {
+          lineGeo.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute([], 3)
+          );
+        }
         magneticLinesRef.current.visible = false;
       }
     }

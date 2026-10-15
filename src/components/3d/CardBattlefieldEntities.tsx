@@ -20,6 +20,8 @@ export const CardBattlefieldEntities: React.FC = () => {
   const boardBounceRef = useRef<THREE.Group>(null);
   const broomSweptRef = useRef<THREE.Group>(null);
   const broomModelRef = useRef<THREE.Group>(null);
+  const magneticGroupRef = useRef<THREE.Group>(null);
+  const simDurationRef = useRef<number>(0);
 
   const isBoardActive =
     activeCardId === 'CARD_BOARD' || activeTurnCard?.id === 'CARD_BOARD';
@@ -42,8 +44,33 @@ export const CardBattlefieldEntities: React.FC = () => {
     return Math.PI; // Default facing north (-Z)
   }, [lockedDirection, drag]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const elapsed = clock.getElapsedTime();
+
+    if (aimingState === 'SIMULATING') {
+      simDurationRef.current += delta;
+    } else {
+      simDurationRef.current = 0;
+    }
+
+    // Magnetic field fadeout: active for exactly 1.2s after flick, then vanishes
+    if (magneticGroupRef.current) {
+      const dur = simDurationRef.current;
+      if (dur >= 1.2) {
+        magneticGroupRef.current.visible = false;
+      } else {
+        magneticGroupRef.current.visible = true;
+        const fade = dur > 0.9 ? 1 - (dur - 0.9) / 0.3 : 1.0;
+        magneticGroupRef.current.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            const mat = child.material as THREE.MeshBasicMaterial;
+            if (mat.opacity !== undefined) {
+              mat.opacity = 0.28 * fade;
+            }
+          }
+        });
+      }
+    }
     if (boardBounceRef.current && isBoardActive) {
       // Subtle hovering pulse indicator on the board
       boardBounceRef.current.position.y = 0.12 + Math.sin(elapsed * 4) * 0.008;
@@ -175,18 +202,32 @@ export const CardBattlefieldEntities: React.FC = () => {
         </group>
       )}
 
-      {/* 3. CARD_MAGNETIC: Field Indicators on Target Marbles */}
+      {/* 3. CARD_MAGNETIC: Full 360 Circular Suction Field (Radius 0.8m, Buffer 0.28m, Active 1.2s) */}
       {isMagneticActive && aimingState === 'SIMULATING' && (
-        <mesh position={[gacoanPos[0], 0.008, gacoanPos[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.3, 1.35, 36]} />
-          <meshBasicMaterial
-            color="#a855f7"
-            transparent
-            opacity={0.28}
-            depthWrite={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
+        <group ref={magneticGroupRef} position={[gacoanPos[0], 0.008, gacoanPos[2]]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            {/* Full 360 ring: inner 0.28m (safe buffer), outer 0.8m (field radius) */}
+            <ringGeometry args={[0.28, 0.8, 48]} />
+            <meshBasicMaterial
+              color="#a855f7"
+              transparent
+              opacity={0.28}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {/* Subtle perimeter border circle */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
+            <ringGeometry args={[0.78, 0.8, 48]} />
+            <meshBasicMaterial
+              color="#d8b4fe"
+              transparent
+              opacity={0.65}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
       )}
     </group>
   );

@@ -89,28 +89,52 @@ describe('targetPhysicsRegistry', () => {
     expect(map.get('t1')).toBe(b1);
   });
 
-  it('applies directional magnetic impulse to target marbles within attraction radius', () => {
-    let appliedImpulse: { x: number; y: number; z: number } | null = null;
-    const nearbyBody = makeMockBody({
-      translation: { x: 0.5, y: 0.08, z: 0 },
+  it('applies 360-degree circular magnetic impulse within 0.8m radius and outside safe buffer (0.28m)', () => {
+    let appliedImpulseNorth: { x: number; y: number; z: number } | null = null;
+    let appliedImpulseSouth: { x: number; y: number; z: number } | null = null;
+
+    const northBody = makeMockBody({
+      translation: { x: 0, y: 0.08, z: -0.5 }, // North at distance 0.5m (within 0.8m)
       onApplyImpulse: (imp) => {
-        appliedImpulse = imp;
+        appliedImpulseNorth = imp;
       },
     });
+    const southBody = makeMockBody({
+      translation: { x: 0, y: 0.08, z: 0.5 }, // South at distance 0.5m (within 0.8m)
+      onApplyImpulse: (imp) => {
+        appliedImpulseSouth = imp;
+      },
+    });
+    const tooCloseBufferBody = makeMockBody({
+      translation: { x: 0, y: 0.08, z: -0.15 }, // Inside safe buffer distance (<= 0.28m, should NOT collide)
+    });
     const farawayBody = makeMockBody({
-      translation: { x: 3.5, y: 0.08, z: 0 },
+      translation: { x: 0, y: 0.08, z: -1.2 }, // Outside 0.8m radius
     });
 
-    registerTargetBody('near', nearbyBody);
+    registerTargetBody('north', northBody);
+    registerTargetBody('south', southBody);
+    registerTargetBody('too-close', tooCloseBufferBody);
     registerTargetBody('far', farawayBody);
 
     // Gacoan origin at [0, 0.08, 0]
-    const affected = applyMagneticAttraction({ x: 0, y: 0.08, z: 0 }, 1.4, 0.002);
+    const affected = applyMagneticAttraction(
+      { x: 0, y: 0.08, z: 0 },
+      0.8,
+      0.00065,
+      0.28
+    );
 
-    expect(affected).toContain('near');
+    // Both north and south 360-degree targets must be pulled
+    expect(affected).toContain('north');
+    expect(affected).toContain('south');
+    expect(affected).not.toContain('too-close');
     expect(affected).not.toContain('far');
-    expect(appliedImpulse).not.toBeNull();
-    // The impulse on 'near' (located at x = 0.5) must pull towards origin (negative x)
-    expect(appliedImpulse!.x).toBeLessThan(0);
+
+    expect(appliedImpulseNorth).not.toBeNull();
+    expect(appliedImpulseNorth!.z).toBeGreaterThan(0); // Pulled south towards 0
+
+    expect(appliedImpulseSouth).not.toBeNull();
+    expect(appliedImpulseSouth!.z).toBeLessThan(0); // Pulled north towards 0
   });
 });

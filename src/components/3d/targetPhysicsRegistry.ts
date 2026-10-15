@@ -73,36 +73,50 @@ export function getAllTargetBodies(): ReadonlyMap<string, RapierRigidBody> {
 }
 
 /**
- * Applies an attractive magnetic impulse vector toward an origin point for all target marbles within a radius.
- * Returns array of target IDs that were attracted this frame.
+ * Applies an attractive magnetic impulse vector toward an origin point for all target marbles
+ * in a 360-degree circle radius, maintaining a safe buffer distance to prevent target
+ * and gacoan from colliding.
+ *
+ * @param origin - Current 3D position of the gacoan marble
+ * @param radius - Maximum reach distance of the magnetic field (default 0.8m)
+ * @param maxImpulse - Gentle suction force magnitude (default 0.00065)
+ * @param minDistance - Stop-suction buffer distance so marbles do not collide (default 0.28m)
+ * @returns array of target IDs attracted this frame
  */
 export function applyMagneticAttraction(
   origin: { x: number; y: number; z: number },
-  radius: number = 1.35,
-  maxImpulse: number = 0.0018
+  radius: number = 0.8,
+  maxImpulse: number = 0.00065,
+  minDistance: number = 0.28
 ): string[] {
   const affectedIds: string[] = [];
+
   for (const [id, body] of targetRigidBodies.entries()) {
     try {
       const trans = body.translation();
-      const dx = origin.x - trans.x;
-      const dz = origin.z - trans.z;
-      const distSq = dx * dx + dz * dz;
-      const dist = Math.sqrt(distSq);
+      // Vector from gacoan to target marble
+      const toTargetX = trans.x - origin.x;
+      const toTargetZ = trans.z - origin.z;
+      const dist = Math.hypot(toTargetX, toTargetZ);
 
-      if (dist > 0.05 && dist <= radius) {
+      // Must be within reach radius (0.8m) and outside the safe buffer distance (0.28m, prevents collision)
+      if (dist > minDistance && dist <= radius) {
         body.wakeUp();
-        // Falloff factor: marbles closer to gacoan feel a tighter suction pull
-        const falloff = 1 - (dist / radius);
-        const forceMagnitude = maxImpulse * falloff;
-        const normX = dx / dist;
-        const normZ = dz / dist;
+
+        // Smooth falloff factor: gently eases as target approaches minDistance
+        const range = radius - minDistance;
+        const falloff = range > 0.001 ? (dist - minDistance) / range : 1.0;
+        const forceMagnitude = maxImpulse * Math.min(1.0, Math.max(0.15, falloff));
+
+        // Pull direction: target is pulled toward gacoan origin (-toTarget)
+        const normPullX = -toTargetX / dist;
+        const normPullZ = -toTargetZ / dist;
 
         body.applyImpulse(
           {
-            x: normX * forceMagnitude,
+            x: normPullX * forceMagnitude,
             y: 0,
-            z: normZ * forceMagnitude,
+            z: normPullZ * forceMagnitude,
           },
           true
         );

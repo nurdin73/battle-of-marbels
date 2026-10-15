@@ -227,10 +227,15 @@ export const ShooterMarble: React.FC = () => {
     simulatingFrameCountRef.current += 1;
     simulatingDurationRef.current += delta;
 
-    // 1. CARD_MAGNETIC: Actively attract target marbles within suction radius toward gacoan
-    if (activeTurnCard?.id === 'CARD_MAGNETIC') {
+    // 1. CARD_MAGNETIC: Actively attract target marbles within 0.8m radius for 1.2s after launch
+    if (activeTurnCard?.id === 'CARD_MAGNETIC' && simulatingDurationRef.current <= 1.2) {
       const trans = rigidBodyRef.current.translation();
-      applyMagneticAttraction({ x: trans.x, y: trans.y, z: trans.z }, 1.45, 0.0022);
+      applyMagneticAttraction(
+        { x: trans.x, y: trans.y, z: trans.z },
+        0.8,
+        0.00065,
+        0.28
+      );
     }
 
     // 2. CARD_WIND: Continuous forward aerodynamic thrust during initial 0.35s of flick
@@ -436,8 +441,8 @@ export const ShooterMarble: React.FC = () => {
 
           {renderMaterial()}
 
-          {/* Magnetic Aura Sphere when CARD_MAGNETIC is active */}
-          {activeTurnCard?.id === 'CARD_MAGNETIC' && (
+          {/* Magnetic Aura Sphere when CARD_MAGNETIC is active (visible during aiming/charging or first 1.2s of flick) */}
+          {activeTurnCard?.id === 'CARD_MAGNETIC' && (aimingState !== 'SIMULATING' || simulatingDurationRef.current <= 1.2) && (
             <mesh>
               <sphereGeometry args={[gacoanR * 1.6, 24, 24]} />
               <meshBasicMaterial
