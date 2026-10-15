@@ -29,9 +29,6 @@ export const TurnTimer: React.FC = () => {
       data-testid="turn-timer"
       className="flex flex-col items-center justify-center select-none pointer-events-none leading-tight"
     >
-      <span className="font-heading text-lg sm:text-xl font-black tracking-wider text-[#fde047] text-stroke-black-heavy">
-        GILIRAN KAMU!
-      </span>
       {!isSantai && (
         <span
           data-testid="turn-timer-value"
