@@ -15,6 +15,7 @@ import {
   TOSS_REQUIRED_STILL_SECONDS,
   TOSS_WATCHDOG_SECONDS,
 } from './multiplayer-toss.utils';
+import { areAllTargetsAtRest } from './targetPhysicsRegistry';
 
 const P1_MARBLE_TEXTURE_URL = '/assets/textures/marble-blue-white.png';
 const P2_MARBLE_TEXTURE_URL = '/assets/textures/marble-red-teal.png';
@@ -57,11 +58,10 @@ export const MultiplayerGacoans: React.FC = () => {
   const tossShotDoneP2 = useMultiplayerStore((s) => s.tossShotDoneP2);
   const tossBannerMessage = useMultiplayerStore((s) => s.tossBannerMessage);
 
-  // Still frame counters and timers for resting and out-of-bounds detection
-  const simulatingFramesRef = useRef<number>(0);
-  const stillFramesRef = useRef<number>(0);
+  // Still timers for 100% rest and out-of-bounds detection during PLAYING phase
+  const matchStillSecondsRef = useRef<number>(0);
+  const matchSimulatingSecondsRef = useRef<number>(0);
   const outOfBoundsTimerRef = useRef<number>(0);
-  const simulatingDurationRef = useRef<number>(0);
 
   // Active rigid body for slingshot: attaches to P1 if Host, P2 if Guest
   const activeLocalRigidBody = isHost ? p1RigidBodyRef : p2RigidBodyRef;
@@ -308,15 +308,13 @@ export const MultiplayerGacoans: React.FC = () => {
 
     // 3. Official match simulation & rest detection (only in PLAYING phase)
     if (aimingState !== 'SIMULATING') {
-      simulatingFramesRef.current = 0;
-      stillFramesRef.current = 0;
+      matchStillSecondsRef.current = 0;
+      matchSimulatingSecondsRef.current = 0;
       outOfBoundsTimerRef.current = 0;
-      simulatingDurationRef.current = 0;
       return;
     }
 
-    simulatingFramesRef.current += 1;
-    simulatingDurationRef.current += delta;
+    matchSimulatingSecondsRef.current += delta;
 
     const t1 = p1RigidBodyRef.current?.translation();
     const t2 = p2RigidBodyRef.current?.translation();
@@ -339,12 +337,11 @@ export const MultiplayerGacoans: React.FC = () => {
     // Helper to resolve match turn outcome and synchronize
     const resolveMatchOutcome = (forceResetP1OOB = false, forceResetP2OOB = false) => {
       setAimingState('EVALUATING');
-      stillFramesRef.current = 0;
-      simulatingFramesRef.current = 0;
+      matchStillSecondsRef.current = 0;
+      matchSimulatingSecondsRef.current = 0;
       outOfBoundsTimerRef.current = 0;
-      simulatingDurationRef.current = 0;
 
-      // Halt physics velocities immediately
+      // Halt physics velocities to settle resting coordinates
       p1RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
       p1RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
       p2RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -440,24 +437,36 @@ export const MultiplayerGacoans: React.FC = () => {
       outOfBoundsTimerRef.current = 0;
     }
 
-    // Safety watchdog: if marbles keep rolling/jittering for > 7s, force settlement
-    if (simulatingDurationRef.current >= SCENE_PERIMETER_BOUNDS.maxSimulationWatchdogSeconds) {
+    // Safety watchdog: if marbles keep rolling/jittering indefinitely, force settlement after 20s
+    const MATCH_WATCHDOG_MAX_SECONDS = 20.0;
+    if (matchSimulatingSecondsRef.current >= MATCH_WATCHDOG_MAX_SECONDS) {
+      console.warn('[Match] Watchdog resolved turn before all marbles fully settled');
       resolveMatchOutcome(isP1OOB, isP2OOB);
       return;
     }
 
-    // Standard rest velocity detection
-    const vel1 = p1RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
-    const vel2 = p2RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
-    const speed1 = Math.hypot(vel1.x, vel1.y, vel1.z);
-    const speed2 = Math.hypot(vel2.x, vel2.y, vel2.z);
-    const maxSpeed = Math.max(speed1, speed2);
+    // 100% COMPLETE REST VERIFICATION:
+    // Requires BOTH gacoan marbles AND ALL active target marbles in the arena to stop moving
+    const b1 = p1RigidBodyRef.current;
+    const b2 = p2RigidBodyRef.current;
+    const p1AtRest = b1 ? isBodyAtRest(b1.linvel(), b1.angvel(), b1.isSleeping()) : true;
+    const p2AtRest = b2 ? isBodyAtRest(b2.linvel(), b2.angvel(), b2.isSleeping()) : true;
+    const targetsAtRest = areAllTargetsAtRest();
 
-    if (maxSpeed < ARENA_CONFIG.restVelocityThreshold && simulatingFramesRef.current > 15) {
-      stillFramesRef.current += 1;
+    const allMarblesAtRest = p1AtRest && p2AtRest && targetsAtRest;
 
-      if (stillFramesRef.current > 20) {
-        resolveMatchOutcome(false, false);
+    // Minimum simulation duration buffer (0.45s) ensures the initial slingshot impulse has registered
+    const MATCH_MIN_SIMULATION_SECONDS = 0.45;
+    const MATCH_REQUIRED_STILL_SECONDS = 0.85;
+
+    if (matchSimulatingSecondsRef.current >= MATCH_MIN_SIMULATION_SECONDS) {
+      if (allMarblesAtRest) {
+        matchStillSecondsRef.current += delta;
+        if (matchStillSecondsRef.current >= MATCH_REQUIRED_STILL_SECONDS) {
+          resolveMatchOutcome(false, false);
+        }
+      } else {
+        matchStillSecondsRef.current = 0;
       }
     }
   });

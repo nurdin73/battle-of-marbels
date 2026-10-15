@@ -7,6 +7,7 @@ import { MarbleEntity } from '../../types/physics.types';
 import { TARGET_MARBLE_PHYSICS, ARENA_CONFIG, SCENE_PERIMETER_BOUNDS } from '../../constants/physics.constants';
 import { useGameStore } from '../../store/useGameStore';
 import { marbleAudio } from '../../utils/soundSynth.utils';
+import { registerTargetBody, unregisterTargetBody } from './targetPhysicsRegistry';
 
 export const TARGET_MARBLE_TEXTURE_URLS = [
   '/assets/textures/marble-green-yellow.png',
@@ -54,6 +55,18 @@ export const TargetMarble: React.FC<TargetMarbleProps> = ({ marble }) => {
   const preShotTargetPositions = useGameStore((s) => s.preShotTargetPositions);
   const targetLivePositions = useGameStore((s) => s.targetLivePositions);
   const marblesOutsideRing = useGameStore((s) => s.marblesOutsideRing);
+
+  // Register active rigid body into target physics monitor for 100% rest verification
+  useEffect(() => {
+    if (rigidBodyRef.current && !isCollected) {
+      registerTargetBody(marble.id, rigidBodyRef.current);
+    } else {
+      unregisterTargetBody(marble.id);
+    }
+    return () => {
+      unregisterTargetBody(marble.id);
+    };
+  }, [marble.id, isCollected, resetRevision, foulRestoreRevision]);
 
   // Sync collected state if marble is marked outside ring in store
   useEffect(() => {
