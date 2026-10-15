@@ -7,6 +7,7 @@ import {
   ActiveFlightData,
   TurnEvaluationOutcome,
 } from '../types/physics.types';
+import { TacticalCard } from '../types/card.types';
 import { ARENA_CONFIG, TARGET_SWIRL_COLORS, GAMEPLAY_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { useCardStore } from './useCardStore';
@@ -17,10 +18,17 @@ interface DragState {
   percentage: number;
 }
 
+export interface CollisionEffectData {
+  point: [number, number, number];
+  timestamp: number;
+  intensity: number;
+}
+
 interface GameStoreState {
   currentScreen: AppScreen;
   aimingState: AimingState;
   gacoanMaterial: MarbleMaterialType;
+  baseGacoanMaterial: MarbleMaterialType;
   gacoanCurrentPos: [number, number, number];
   drag: DragState;
   targetMarbles: MarbleEntity[];
@@ -47,6 +55,10 @@ interface GameStoreState {
   resetRevision: number;
   evaluationEpoch: number;
   flightData: ActiveFlightData | null;
+  activeTurnCard: TacticalCard | null;
+  lastCollisionEffect: CollisionEffectData | null;
+  isBroomSweeping: boolean;
+  broomSweepProgress: number;
   lockedDirection: { x: number; z: number } | null;
   customMarbleCount: number;
   oscillatingPower: number;
@@ -58,6 +70,10 @@ interface GameStoreState {
   setTurnTimeLimit: (seconds: number | null) => void;
   startMatchWithMarbleCount: (count: number, timeLimit?: number | null) => void;
   loadLevelConfig: (level: import('../types/level.types').LevelConfig) => void;
+  setActiveTurnCard: (card: TacticalCard | null) => void;
+  triggerCollisionEffect: (point: [number, number, number], intensity?: number) => void;
+  setIsBroomSweeping: (isBroomSweeping: boolean) => void;
+  setBroomSweepProgress: (progress: number) => void;
   setAimingState: (state: AimingState) => void;
   setLockedDirection: (dir: { x: number; z: number } | null) => void;
   setOscillatingPower: (power: number) => void;
@@ -65,6 +81,7 @@ interface GameStoreState {
   fireFlick: (powerPercentage: number) => void;
   cancelAiming: () => void;
   setGacoanMaterial: (material: MarbleMaterialType) => void;
+  setTemporaryGacoanMaterial: (material: MarbleMaterialType) => void;
   updateGacoanPos: (pos: [number, number, number]) => void;
   updateTargetLivePosition: (id: string, pos: [number, number, number]) => void;
   setDrag: (vector: { x: number; z: number }, distance: number, percentage: number) => void;
@@ -134,6 +151,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   currentScreen: 'MAIN_MENU',
   aimingState: 'IDLE',
   gacoanMaterial: 'GLASS_CLASSIC',
+  baseGacoanMaterial: 'GLASS_CLASSIC',
   gacoanCurrentPos: INITIAL_GACOAN_POS,
   drag: {
     vector: { x: 0, z: 0 },
@@ -164,10 +182,28 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   resetRevision: 0,
   evaluationEpoch: 0,
   flightData: null,
+  activeTurnCard: null,
+  lastCollisionEffect: null,
+  isBroomSweeping: false,
+  broomSweepProgress: 0,
   lockedDirection: null,
   customMarbleCount: 9,
   oscillatingPower: 0,
   launchTriggerCallback: null,
+
+  setActiveTurnCard: (activeTurnCard) => set({ activeTurnCard }),
+
+  triggerCollisionEffect: (point, intensity = 1.0) =>
+    set({
+      lastCollisionEffect: {
+        point,
+        timestamp: Date.now(),
+        intensity,
+      },
+    }),
+
+  setIsBroomSweeping: (isBroomSweeping) => set({ isBroomSweeping }),
+  setBroomSweepProgress: (broomSweepProgress) => set({ broomSweepProgress }),
 
   startGame: () => {
     const limit = get().turnTimeLimitSeconds;
@@ -267,7 +303,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
 
-  setGacoanMaterial: (gacoanMaterial) => set({ gacoanMaterial }),
+  setGacoanMaterial: (gacoanMaterial) =>
+    set({ gacoanMaterial, baseGacoanMaterial: gacoanMaterial }),
+
+  setTemporaryGacoanMaterial: (gacoanMaterial) => set({ gacoanMaterial }),
 
   updateGacoanPos: (gacoanCurrentPos) => set({ gacoanCurrentPos }),
 
@@ -435,12 +474,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       lastTurnOutcome: resultOutcome,
       comboStreak: nextComboStreak,
       gacoanCurrentPos: nextGacoanPos,
+      gacoanMaterial: state.baseGacoanMaterial,
       turnTimer: timerLimit,
       isTimerActive: !isGameOver && timerLimit !== null,
       isGameOver,
       starsAwarded,
       targetsPocketedThisTurn: 0,
       targetsPocketedThisTurnIds: [],
+      activeTurnCard: null,
+      isBroomSweeping: false,
+      broomSweepProgress: 0,
     });
   },
 

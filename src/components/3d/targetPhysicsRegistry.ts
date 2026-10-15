@@ -64,3 +64,53 @@ export function areAllTargetsAtRest(
 export function getRegisteredTargetCount(): number {
   return targetRigidBodies.size;
 }
+
+/**
+ * Returns read-only map of currently registered active target bodies.
+ */
+export function getAllTargetBodies(): ReadonlyMap<string, RapierRigidBody> {
+  return targetRigidBodies;
+}
+
+/**
+ * Applies an attractive magnetic impulse vector toward an origin point for all target marbles within a radius.
+ * Returns array of target IDs that were attracted this frame.
+ */
+export function applyMagneticAttraction(
+  origin: { x: number; y: number; z: number },
+  radius: number = 1.35,
+  maxImpulse: number = 0.0018
+): string[] {
+  const affectedIds: string[] = [];
+  for (const [id, body] of targetRigidBodies.entries()) {
+    try {
+      const trans = body.translation();
+      const dx = origin.x - trans.x;
+      const dz = origin.z - trans.z;
+      const distSq = dx * dx + dz * dz;
+      const dist = Math.sqrt(distSq);
+
+      if (dist > 0.05 && dist <= radius) {
+        body.wakeUp();
+        // Falloff factor: marbles closer to gacoan feel a tighter suction pull
+        const falloff = 1 - (dist / radius);
+        const forceMagnitude = maxImpulse * falloff;
+        const normX = dx / dist;
+        const normZ = dz / dist;
+
+        body.applyImpulse(
+          {
+            x: normX * forceMagnitude,
+            y: 0,
+            z: normZ * forceMagnitude,
+          },
+          true
+        );
+        affectedIds.push(id);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return affectedIds;
+}

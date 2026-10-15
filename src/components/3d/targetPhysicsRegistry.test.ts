@@ -5,6 +5,8 @@ import {
   clearTargetBodies,
   areAllTargetsAtRest,
   getRegisteredTargetCount,
+  getAllTargetBodies,
+  applyMagneticAttraction,
 } from './targetPhysicsRegistry';
 import type { RapierRigidBody } from '@react-three/rapier';
 
@@ -12,11 +14,18 @@ function makeMockBody(options: {
   isSleeping?: boolean;
   linvel?: { x: number; y: number; z: number };
   angvel?: { x: number; y: number; z: number };
+  translation?: { x: number; y: number; z: number };
+  onApplyImpulse?: (impulse: { x: number; y: number; z: number }) => void;
 }): RapierRigidBody {
   return {
     isSleeping: () => options.isSleeping ?? false,
     linvel: () => options.linvel ?? { x: 0, y: 0, z: 0 },
     angvel: () => options.angvel ?? { x: 0, y: 0, z: 0 },
+    translation: () => options.translation ?? { x: 0, y: 0, z: 0 },
+    wakeUp: () => {},
+    applyImpulse: (impulse: { x: number; y: number; z: number }) => {
+      options.onApplyImpulse?.(impulse);
+    },
   } as unknown as RapierRigidBody;
 }
 
@@ -70,5 +79,38 @@ describe('targetPhysicsRegistry', () => {
     registerTargetBody('t2', b2);
 
     expect(areAllTargetsAtRest()).toBe(true);
+  });
+
+  it('provides read-only access to all registered bodies via getAllTargetBodies', () => {
+    const b1 = makeMockBody({ isSleeping: true });
+    registerTargetBody('t1', b1);
+    const map = getAllTargetBodies();
+    expect(map.size).toBe(1);
+    expect(map.get('t1')).toBe(b1);
+  });
+
+  it('applies directional magnetic impulse to target marbles within attraction radius', () => {
+    let appliedImpulse: { x: number; y: number; z: number } | null = null;
+    const nearbyBody = makeMockBody({
+      translation: { x: 0.5, y: 0.08, z: 0 },
+      onApplyImpulse: (imp) => {
+        appliedImpulse = imp;
+      },
+    });
+    const farawayBody = makeMockBody({
+      translation: { x: 3.5, y: 0.08, z: 0 },
+    });
+
+    registerTargetBody('near', nearbyBody);
+    registerTargetBody('far', farawayBody);
+
+    // Gacoan origin at [0, 0.08, 0]
+    const affected = applyMagneticAttraction({ x: 0, y: 0.08, z: 0 }, 1.4, 0.002);
+
+    expect(affected).toContain('near');
+    expect(affected).not.toContain('far');
+    expect(appliedImpulse).not.toBeNull();
+    // The impulse on 'near' (located at x = 0.5) must pull towards origin (negative x)
+    expect(appliedImpulse!.x).toBeLessThan(0);
   });
 });

@@ -8,6 +8,7 @@ import { useMultiplayerStore } from '../store/useMultiplayerStore';
 import { ARENA_CONFIG } from '../constants/physics.constants';
 import { marbleAudio } from '../utils/soundSynth.utils';
 import { calculateTrajectory } from '../utils/trajectory.utils';
+import { sweepPebblesInCorridor } from '../components/3d/BattlefieldPebbles';
 
 export function useSlingshot(
   rigidBodyRef: React.RefObject<RapierRigidBody>
@@ -56,7 +57,7 @@ export function useSlingshot(
         if (mod.trajectoryDistanceMultiplier) distanceMultiplier = mod.trajectoryDistanceMultiplier;
         if (mod.apexHeightMultiplier) apexHeightMultiplier = mod.apexHeightMultiplier;
         if (mod.swapMaterial) {
-          storeState.setGacoanMaterial(mod.swapMaterial);
+          storeState.setTemporaryGacoanMaterial(mod.swapMaterial);
         }
       }
 
@@ -88,108 +89,176 @@ export function useSlingshot(
       const normX = lockedDir.x;
       const normZ = lockedDir.z;
 
-      if (isLob) {
-        // LOB MODE: Parabolic arch through the air (CARD_LOB exclusive)
-        const trajectory = calculateTrajectory(
-          shooterOrigin,
-          { x: normX * clampedPercentage, y: 0, z: normZ * clampedPercentage },
-          clampedPercentage,
-          activeTargets,
-          ARENA_CONFIG.marbleRadius,
-          {
-            isLob,
-            distanceMultiplier,
-            apexHeightMultiplier,
+      const performFlickRelease = () => {
+        if (!rigidBodyRef.current) return;
+
+        if (isLob) {
+          // LOB MODE: Parabolic arch through the air (CARD_LOB exclusive)
+          // Use exact aimed drag percentage so the flight landing point matches the player's aimed trajectory
+          const aimedPercentage =
+            storeState.drag.percentage > 0 ? storeState.drag.percentage : clampedPercentage;
+          const trajectory = calculateTrajectory(
+            shooterOrigin,
+            {
+              x: normX * ARENA_CONFIG.maxDragDistance,
+              y: 0,
+              z: normZ * ARENA_CONFIG.maxDragDistance,
+            },
+            aimedPercentage,
+            activeTargets,
+            ARENA_CONFIG.marbleRadius,
+            {
+              isLob,
+              distanceMultiplier,
+              apexHeightMultiplier,
+            }
+          );
+
+          const flightDuration = 0.55 + ratio * 0.40;
+          setFlightData({
+            origin: [shooterOrigin.x, shooterOrigin.y, shooterOrigin.z],
+            landingPoint: trajectory.landingPoint,
+            apexHeight: trajectory.apexHeight,
+            direction: { x: normX, z: normZ },
+            impulseMagnitude: effectiveImpulse,
+            hitTargetId: trajectory.hitTargetId,
+            isHit: trajectory.isHit,
+            duration: flightDuration,
+          });
+
+          rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.sleep();
+
+          setAimingState('AIRBORNE');
+        } else {
+          // AUTHENTIC GROUND ROLL: Native Rapier linear impulse directly on soil plane
+          setFlightData(null);
+          rigidBodyRef.current.wakeUp();
+          rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.applyImpulse(
+            {
+              x: normX * effectiveImpulse,
+              y: 0.0,
+              z: normZ * effectiveImpulse,
+            },
+            true
+          );
+
+          setAimingState('SIMULATING');
+        }
+
+        // If multiplayer mode is active, broadcast shot to peer
+        const multiplayerStore = useMultiplayerStore.getState();
+        if (multiplayerStore.isMultiplayerActive) {
+          if (multiplayerStore.matchPhase === 'TOSS_PHASE') {
+            multiplayerStore.broadcastTossShot({
+              turnIndex: 0,
+              playerId: multiplayerStore.localPlayer.id,
+              timestamp: Date.now(),
+              impulse: {
+                x: normX * effectiveImpulse,
+                y: 0.0,
+                z: normZ * effectiveImpulse,
+              },
+              originPosition: {
+                x: shooterOrigin.x,
+                y: shooterOrigin.y,
+                z: shooterOrigin.z,
+              },
+            });
+          } else {
+            multiplayerStore.broadcastShot({
+              turnIndex: storeState.turnCount,
+              playerId: multiplayerStore.localPlayer.id,
+              timestamp: Date.now(),
+              impulse: {
+                x: normX * effectiveImpulse,
+                y: 0.0,
+                z: normZ * effectiveImpulse,
+              },
+              originPosition: {
+                x: shooterOrigin.x,
+                y: shooterOrigin.y,
+                z: shooterOrigin.z,
+              },
+              appliedCardId: activeCard?.id,
+            });
           }
+        }
+
+        // Record active turn card in game store for battlefield simulation before consuming from hand
+        if (activeCard) {
+          storeState.setActiveTurnCard(activeCard);
+          cardStore.consumeActiveCard();
+        } else {
+          storeState.setActiveTurnCard(null);
+        }
+
+        // Sound & state
+        marbleAudio.playLaunchSound(ratio);
+        recordFlick();
+        if (isLob) {
+          setAimingState('AIRBORNE');
+        }
+        clearDrag();
+        setLockedDirection(null);
+      };
+
+      // CARD_BROOM: Perform active pre-launch sweeping sequence before gacoan release
+      if (activeCard?.id === 'CARD_BROOM') {
+        storeState.setIsBroomSweeping(true);
+        storeState.setBroomSweepProgress(0);
+
+        // Physically sweep pebbles away from the shooting lane corridor
+        sweepPebblesInCorridor(
+          { x: shooterOrigin.x, z: shooterOrigin.z },
+          { x: normX, z: normZ },
+          0.85,
+          3.6
         );
 
-        const flightDuration = 0.55 + ratio * 0.40;
-        setFlightData({
-          origin: [shooterOrigin.x, shooterOrigin.y, shooterOrigin.z],
-          landingPoint: trajectory.landingPoint,
-          apexHeight: trajectory.apexHeight,
-          direction: { x: normX, z: normZ },
-          impulseMagnitude: effectiveImpulse,
-          hitTargetId: trajectory.hitTargetId,
-          isHit: trajectory.isHit,
-          duration: flightDuration,
+        // Sweeping audio cue
+        marbleAudio.playCollisionSound({
+          materialType: 'MARBLE_STONE',
+          relativeVelocity: 0.35,
         });
 
-        rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        rigidBodyRef.current.sleep();
+        const sweepDurationMs = 850;
+        const sweepStart = performance.now();
+        let secondSoundPlayed = false;
 
-        setAimingState('AIRBORNE');
+        const sweepInterval = setInterval(() => {
+          const elapsed = performance.now() - sweepStart;
+          const progress = Math.min(1.0, elapsed / sweepDurationMs);
+          storeState.setBroomSweepProgress(progress);
+
+          if (progress > 0.45 && !secondSoundPlayed) {
+            secondSoundPlayed = true;
+            marbleAudio.playCollisionSound({
+              materialType: 'MARBLE_STONE',
+              relativeVelocity: 0.4,
+            });
+            // Multi-pass sweep: re-clear corridor forward as broom advances
+            sweepPebblesInCorridor(
+              { x: shooterOrigin.x, z: shooterOrigin.z },
+              { x: normX, z: normZ },
+              0.85,
+              3.6
+            );
+          }
+
+          if (progress >= 1.0) {
+            clearInterval(sweepInterval);
+            storeState.setIsBroomSweeping(false);
+            storeState.setBroomSweepProgress(0);
+            performFlickRelease();
+          }
+        }, 16);
       } else {
-        // AUTHENTIC GROUND ROLL: Native Rapier linear impulse directly on soil plane
-        setFlightData(null);
-        rigidBodyRef.current.wakeUp();
-        rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        rigidBodyRef.current.applyImpulse(
-          {
-            x: normX * effectiveImpulse,
-            y: 0.0,
-            z: normZ * effectiveImpulse,
-          },
-          true
-        );
-
-        setAimingState('SIMULATING');
+        performFlickRelease();
       }
-
-      // If multiplayer mode is active, broadcast shot to peer
-      const multiplayerStore = useMultiplayerStore.getState();
-      if (multiplayerStore.isMultiplayerActive) {
-        if (multiplayerStore.matchPhase === 'TOSS_PHASE') {
-          multiplayerStore.broadcastTossShot({
-            turnIndex: 0,
-            playerId: multiplayerStore.localPlayer.id,
-            timestamp: Date.now(),
-            impulse: {
-              x: normX * effectiveImpulse,
-              y: 0.0,
-              z: normZ * effectiveImpulse,
-            },
-            originPosition: {
-              x: shooterOrigin.x,
-              y: shooterOrigin.y,
-              z: shooterOrigin.z,
-            },
-          });
-        } else {
-          multiplayerStore.broadcastShot({
-            turnIndex: storeState.turnCount,
-            playerId: multiplayerStore.localPlayer.id,
-            timestamp: Date.now(),
-            impulse: {
-              x: normX * effectiveImpulse,
-              y: 0.0,
-              z: normZ * effectiveImpulse,
-            },
-            originPosition: {
-              x: shooterOrigin.x,
-              y: shooterOrigin.y,
-              z: shooterOrigin.z,
-            },
-            appliedCardId: activeCard?.id,
-          });
-        }
-      }
-
-      // Consume active card after successful flick release
-      if (activeCard) {
-        cardStore.consumeActiveCard();
-      }
-
-      // Sound & state
-      marbleAudio.playLaunchSound(ratio);
-      recordFlick();
-      if (isLob) {
-        setAimingState('AIRBORNE');
-      }
-      clearDrag();
-      setLockedDirection(null);
     },
     [rigidBodyRef, setFlightData, setAimingState, recordFlick, clearDrag, setLockedDirection]
   );

@@ -15,6 +15,10 @@ import { PekaranganBenches } from './PekaranganBenches';
 import { SkyEnvironment } from './SkyEnvironment';
 import { LevelObstacles } from './LevelObstacles';
 import { MultiplayerGacoans } from './MultiplayerGacoans';
+import { BattlefieldHole } from './BattlefieldHole';
+import { BattlefieldPebbles } from './BattlefieldPebbles';
+import { CardBattlefieldEntities } from './CardBattlefieldEntities';
+import { BattlefieldVFX } from './BattlefieldVFX';
 import { useGameStore } from '../../store/useGameStore';
 import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 
@@ -46,6 +50,11 @@ export const SceneContainer: React.FC = () => {
             <PekaranganGrass />
             <PekaranganCornerGrass />
             <LevelObstacles />
+            <BattlefieldHole />
+            <BattlefieldPebbles />
+            <CardBattlefieldEntities />
+            <BattlefieldVFX />
+
             {isMultiplayerActive ? <MultiplayerGacoans /> : <ShooterMarble />}
 
             {/* Target Marbles Cluster - only render when not in TOSS_PHASE */}

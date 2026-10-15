@@ -78,7 +78,8 @@ export const TrajectoryLine: React.FC = () => {
     }
 
     // Fixed steady trajectory direction and target point (does not oscillate with power)
-    const percentage = isCharging ? 100 : drag.percentage;
+    // For lob shots, maintain exact aimed drag percentage so landing point stays fixed during charging
+    const percentage = isLob ? drag.percentage : isCharging ? 100 : drag.percentage;
     const dirVector = isCharging
       ? {
           x: lockedDirection.x * ARENA_CONFIG.maxDragDistance,

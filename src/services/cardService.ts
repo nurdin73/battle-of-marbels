@@ -105,7 +105,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
   {
     id: 'CARD_BROOM',
     name: 'Sapu Lidi',
-    description: 'Membersihkan arena: mengurangi gesekan tanah pada lajur luncur kelereng.',
+    description: 'Membersihkan arena: membuka jalur sapuan licin dengan gesekan minimal pada lajur luncur.',
     category: 'TERRAIN',
     cost: 1,
     cooldownTurns: 1,
@@ -125,7 +125,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
   {
     id: 'CARD_BOARD',
     name: 'Papan Pantul',
-    description: 'Meningkatkan elastisitas pantulan kelereng saat menabrak sasaran.',
+    description: 'Memunculkan papan kayu pantul di arena dan memberikan dorongan pantulan ekstra +25%.',
     category: 'COLLIDER',
     cost: 2,
     cooldownTurns: 2,
@@ -145,7 +145,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
   {
     id: 'CARD_WIND',
     name: 'Kipas Kardus',
-    description: 'Dorongan angin tambahan: sentilan melesat 15% lebih cepat ke depan.',
+    description: 'Dorongan angin kencang: memberikan akselerasi aerodinamis kontinu ke arah luncuran.',
     category: 'DISRUPTIVE',
     cost: 2,
     cooldownTurns: 2,
@@ -165,7 +165,7 @@ export const OFFICIAL_TACTICAL_CARDS: TacticalCard[] = [
   {
     id: 'CARD_MAGNETIC',
     name: 'Batu Magnet',
-    description: 'Tumbukan berenergi tinggi yang menghisap target kelereng di depannya.',
+    description: 'Medan magnet aktif: memancarkan daya tarik fisik yang menyedot kelereng target di depannya.',
     category: 'TACTICAL',
     cost: 3,
     cooldownTurns: 3,
