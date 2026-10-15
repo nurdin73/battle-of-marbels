@@ -80,12 +80,14 @@ export const PowerMeter: React.FC = () => {
   return (
     <div
       data-testid="hud-power-meter"
-      onClick={handleRelease}
-      className="absolute bottom-28 left-1/2 -translate-x-1/2 w-64 sm:w-80 flex flex-col items-center gap-1.5 transition-all animate-fade-in pointer-events-auto select-none z-30 cursor-pointer"
-      title="Klik atau tekan Spasi untuk melepaskan sentilan"
+      className="absolute bottom-20 sm:bottom-28 left-1/2 -translate-x-1/2 w-[90%] max-w-sm sm:w-80 flex flex-col items-center gap-2.5 transition-all animate-in fade-in zoom-in-95 pointer-events-auto select-none z-30"
     >
-      {/* Floating Pure Progress Bar */}
-      <div className="relative w-full h-5 bg-[#ede6dc]/95 rounded-full overflow-hidden border-2 border-stone-800 shadow-[0_4px_12px_rgba(0,0,0,0.35)] p-0.5 backdrop-blur-xs">
+      {/* Power Barometer with Moving Needle */}
+      <div
+        onClick={handleRelease}
+        className="relative w-full h-6 bg-[#ede6dc]/95 rounded-full overflow-hidden border-2 border-stone-800 shadow-[0_4px_14px_rgba(0,0,0,0.35)] p-0.5 backdrop-blur-xs cursor-pointer active:scale-[0.99] transition-transform"
+        title="Ketuk bar untuk melepaskan sentilan"
+      >
         <div
           data-testid="hud-power-meter-fill"
           className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-none shadow-sm`}
@@ -93,7 +95,7 @@ export const PowerMeter: React.FC = () => {
         />
         {/* Moving Needle Indicator */}
         <div
-          className="absolute top-0 bottom-0 w-2.5 bg-white border-2 border-stone-900 rounded-full shadow-md -translate-x-1/2 pointer-events-none"
+          className="absolute top-0 bottom-0 w-3 bg-white border-2 border-stone-900 rounded-full shadow-md -translate-x-1/2 pointer-events-none"
           style={{ left: `${displayPower}%` }}
         />
       </div>
@@ -103,8 +105,39 @@ export const PowerMeter: React.FC = () => {
         data-testid="hud-power-percentage"
         className="font-mono text-sm font-black text-white text-stroke-black-heavy tracking-wider"
       >
-        {displayPower}%
+        Kekuatan: {displayPower}%
       </span>
+
+      {/* Mobile-Friendly Dual Action Dock (BATAL & SENTIL) */}
+      <div className="flex items-center gap-3 w-full justify-center">
+        {/* Tombol Batalkan */}
+        <button
+          type="button"
+          data-testid="btn-cancel-flick"
+          onClick={(e) => {
+            e.stopPropagation();
+            cancelAiming();
+          }}
+          className="timbul-card px-4 py-2.5 rounded-xl border border-stone-300 text-stone-700 font-extrabold text-xs sm:text-sm active:translate-y-[2px] transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 shrink-0"
+        >
+          <span>✕</span>
+          <span>Batal</span>
+        </button>
+
+        {/* Tombol Sentil Utama (Besar & Responsif untuk Jempol) */}
+        <button
+          type="button"
+          data-testid="btn-fire-flick"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRelease();
+          }}
+          className="flex-1 max-w-[200px] py-2.5 px-4 rounded-xl font-heading text-sm sm:text-base font-black tracking-wide text-white bg-gradient-to-b from-emerald-500 to-emerald-600 border-2 border-emerald-400 border-b-[4px] border-b-emerald-800 active:border-b-2 active:translate-y-[2px] shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+        >
+          <span>🎯</span>
+          <span>SENTIL!</span>
+        </button>
+      </div>
     </div>
   );
 };

@@ -9,10 +9,14 @@ import { LevelSelectModal } from './LevelSelectModal';
 import { GameMenuDrawer } from './GameMenuDrawer';
 import { HelpModal } from './HelpModal';
 import { useMultiplayerStore } from '../../store/useMultiplayerStore';
+import { useGameStore } from '../../store/useGameStore';
 import { Menu } from 'lucide-react';
 
 export const HUDOverlay: React.FC = () => {
   const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
+  const aimingState = useGameStore((s) => s.aimingState);
+  const cancelAiming = useGameStore((s) => s.cancelAiming);
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
@@ -72,8 +76,24 @@ export const HUDOverlay: React.FC = () => {
           <DebugControls onOpenHelp={() => setIsHelpOpen(true)} />
         </header>
 
-        {/* Dynamic Power Meter (appears only when aiming/dragging) */}
+        {/* Dynamic Power Meter (appears only when charging) */}
         <PowerMeter />
+
+        {/* Floating Quick Cancel Button (appears when actively dragging/aiming) */}
+        {aimingState === 'AIMING' && (
+          <div className="absolute top-20 right-4 sm:right-6 pointer-events-auto z-40 animate-in fade-in zoom-in-90 duration-150">
+            <button
+              type="button"
+              data-testid="btn-quick-cancel-aim"
+              onClick={() => cancelAiming()}
+              className="timbul-card px-3.5 py-2 rounded-2xl bg-white/95 border-2 border-stone-300 shadow-xl text-stone-800 text-xs sm:text-sm font-black flex items-center gap-1.5 active:translate-y-[2px] cursor-pointer hover:bg-stone-50"
+              title="Batalkan tarikan gacoan"
+            >
+              <span className="text-red-500 text-sm">✕</span>
+              <span>Batal Tarik</span>
+            </button>
+          </div>
+        )}
 
         {/* Clean Bottom Spacing (Hands of Cards occupy bottom) */}
         <div className="pointer-events-none h-16 sm:h-20" />
