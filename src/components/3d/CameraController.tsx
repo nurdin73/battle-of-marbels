@@ -78,8 +78,8 @@ export const CameraController: React.FC = () => {
   }, [cameraFocusTarget, setCameraFocusTarget]);
 
   useFrame(({ camera, clock }) => {
-    // 1. Cinematic slow orbital pan when on MAIN_MENU
-    if (currentScreen === 'MAIN_MENU') {
+    // 1. Cinematic slow orbital pan when on MAIN_MENU in solo mode
+    if (currentScreen === 'MAIN_MENU' && !isMultiplayerActive) {
       const t = clock.getElapsedTime() * 0.12;
       const camRadius = 4.4;
       const camX = Math.sin(t) * camRadius;
@@ -105,8 +105,8 @@ export const CameraController: React.FC = () => {
 
     // When transitioning from MAIN_MENU to PLAYING or into TOSS_PHASE, snap camera directly behind gacoan
     if (
-      (prevScreen.current === 'MAIN_MENU' && currentScreen === 'PLAYING') ||
-      (prevMatchPhase.current !== 'TOSS_PHASE' && matchPhase === 'TOSS_PHASE')
+      ((prevScreen.current === 'MAIN_MENU' && currentScreen === 'PLAYING') || isMultiplayerActive) &&
+      (prevMatchPhase.current !== matchPhase && matchPhase === 'TOSS_PHASE')
     ) {
       prevScreen.current = currentScreen;
       prevMatchPhase.current = matchPhase;
@@ -182,7 +182,7 @@ export const CameraController: React.FC = () => {
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={currentScreen === 'PLAYING' && aimingState !== 'AIMING' && aimingState !== 'CHARGING'}
+      enabled={(currentScreen === 'PLAYING' || isMultiplayerActive) && aimingState !== 'AIMING' && aimingState !== 'CHARGING'}
       enablePan={false}
       minDistance={1.2}
       maxDistance={9.0}

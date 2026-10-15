@@ -8,6 +8,13 @@ import { useMultiplayerStore, INITIAL_P1_POS, INITIAL_P2_POS } from '../../store
 import { useGameStore } from '../../store/useGameStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
+import {
+  isBodyAtRest,
+  resolveTossWinner,
+  Position3,
+  TOSS_REQUIRED_STILL_SECONDS,
+  TOSS_WATCHDOG_SECONDS,
+} from './multiplayer-toss.utils';
 
 const P1_MARBLE_TEXTURE_URL = '/assets/textures/marble-blue-white.png';
 const P2_MARBLE_TEXTURE_URL = '/assets/textures/marble-red-teal.png';
@@ -124,14 +131,15 @@ export const MultiplayerGacoans: React.FC = () => {
   }, [isHost, setAimingState]);
 
   const tossResolutionScheduledRef = useRef<boolean>(false);
-  const tossStillFramesRef = useRef<number>(0);
-  const tossSimulatingFramesRef = useRef<number>(0);
+  // Time-based (seconds, via useFrame delta) so behaviour is identical on 60Hz and 144Hz displays
+  const tossStillSecondsRef = useRef<number>(0);
+  const tossElapsedSecondsRef = useRef<number>(0);
 
   useEffect(() => {
     if (matchPhase === 'TOSS_PHASE') {
       tossResolutionScheduledRef.current = false;
-      tossStillFramesRef.current = 0;
-      tossSimulatingFramesRef.current = 0;
+      tossStillSecondsRef.current = 0;
+      tossElapsedSecondsRef.current = 0;
       // Reposition both gacoans physically back to original starting coordinates
       if (p1RigidBodyRef.current) {
         p1RigidBodyRef.current.setTranslation({ x: INITIAL_P1_POS[0], y: INITIAL_P1_POS[1], z: INITIAL_P1_POS[2] }, true);
@@ -146,6 +154,21 @@ export const MultiplayerGacoans: React.FC = () => {
       useGameStore.getState().updateGacoanPos(isHost ? INITIAL_P1_POS : INITIAL_P2_POS);
     }
   }, [matchPhase, isHost]);
+
+  // Guest: snap both gacoans to the Host-authoritative positions used to decide the toss winner,
+  // so both screens show exactly the state the result was computed from.
+  const tossResult = useMultiplayerStore((s) => s.tossResult);
+  useEffect(() => {
+    if (isHost || !tossResult) return;
+    const snap = (body: RapierRigidBody | null, pos: Position3) => {
+      if (!body) return;
+      body.setTranslation({ x: pos[0], y: pos[1], z: pos[2] }, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    };
+    snap(p1RigidBodyRef.current, tossResult.p1Position);
+    snap(p2RigidBodyRef.current, tossResult.p2Position);
+  }, [isHost, tossResult]);
 
   // Frame monitoring for ball resting & turn transition
   useFrame((_, delta) => {
@@ -191,13 +214,14 @@ export const MultiplayerGacoans: React.FC = () => {
     // 2. Direct Toss Phase resolution: strictly wait for BOTH gacoan balls to completely settle before announcing winner
     if (matchPhase === 'TOSS_PHASE') {
       if (isHost && tossShotDoneP1 && tossShotDoneP2 && !tossResolutionScheduledRef.current) {
-        tossSimulatingFramesRef.current += 1;
+        const body1 = p1RigidBodyRef.current;
+        const body2 = p2RigidBodyRef.current;
+        if (!body1 || !body2) return;
 
-        const vel1 = p1RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
-        const vel2 = p2RigidBodyRef.current?.linvel() || { x: 0, y: 0, z: 0 };
-        const speed1 = Math.hypot(vel1.x, vel1.y, vel1.z);
-        const speed2 = Math.hypot(vel2.x, vel2.y, vel2.z);
-        const maxSpeed = Math.max(speed1, speed2);
+        tossElapsedSecondsRef.current += delta;
+
+        const p1AtRest = isBodyAtRest(body1.linvel(), body1.angvel(), body1.isSleeping());
+        const p2AtRest = isBodyAtRest(body2.linvel(), body2.angvel(), body2.isSleeping());
 
         // Keep dynamic banner updated while waiting for physics to settle
         if (tossBannerMessage !== '⏳ Menunggu kedua gacoan berhenti bergulir...') {
@@ -206,36 +230,44 @@ export const MultiplayerGacoans: React.FC = () => {
           });
         }
 
-        // Both gacoans must have slowed down below rest threshold
-        // Require > 15 simulating frames first to allow impulses to register
-        if (maxSpeed < ARENA_CONFIG.restVelocityThreshold && tossSimulatingFramesRef.current > 15) {
-          tossStillFramesRef.current += 1;
-        } else {
-          tossStillFramesRef.current = 0;
-        }
+        // Both gacoans must stay at rest CONTINUOUSLY; any movement resets the timer
+        tossStillSecondsRef.current = p1AtRest && p2AtRest ? tossStillSecondsRef.current + delta : 0;
 
-        // Safety watchdog: max ~9 seconds (540 frames) in case of micro-jitter
-        const isWatchdogTriggered = tossSimulatingFramesRef.current > 540;
+        const isSettled = tossStillSecondsRef.current >= TOSS_REQUIRED_STILL_SECONDS;
+        const isWatchdogTriggered = tossElapsedSecondsRef.current >= TOSS_WATCHDOG_SECONDS;
 
-        // Only declare toss winner once BOTH gacoans have been completely still for 25 consecutive frames (~0.4s)
-        if (tossStillFramesRef.current >= 25 || isWatchdogTriggered) {
+        if (isSettled || isWatchdogTriggered) {
           tossResolutionScheduledRef.current = true;
 
-          // Halt velocities completely
-          p1RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          p1RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
-          p2RigidBodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          p2RigidBodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          // Read real resting positions — no forced velocity halt beforehand
+          const t1 = body1.translation();
+          const t2 = body2.translation();
+          const p1Pos: Position3 = [t1.x, t1.y, t1.z];
+          const p2Pos: Position3 = [t2.x, t2.y, t2.z];
 
-          const t1 = p1RigidBodyRef.current?.translation();
-          const t2 = p2RigidBodyRef.current?.translation();
-          const p1Pos: [number, number, number] = t1 ? [t1.x, t1.y, t1.z] : [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
-          const p2Pos: [number, number, number] = t2 ? [t2.x, t2.y, t2.z] : [0.25, ARENA_CONFIG.marbleRadius, 2.3];
+          if (isWatchdogTriggered && !isSettled) {
+            console.warn('[Toss] Watchdog resolved toss before both gacoans fully settled', {
+              p1: { lin: body1.linvel(), ang: body1.angvel(), sleeping: body1.isSleeping() },
+              p2: { lin: body2.linvel(), ang: body2.angvel(), sleeping: body2.isSleeping() },
+            });
+          }
+          console.debug('[Toss] resolved', {
+            elapsed: tossElapsedSecondsRef.current.toFixed(2),
+            p1Sleeping: body1.isSleeping(),
+            p2Sleeping: body2.isSleeping(),
+            p1Pos,
+            p2Pos,
+          });
 
-          // Calculate distances to circle ring line (R = 1.8)
-          const d1 = Math.abs(Math.hypot(p1Pos[0], p1Pos[2]) - ARENA_CONFIG.ringRadius);
-          const d2 = Math.abs(Math.hypot(p2Pos[0], p2Pos[2]) - ARENA_CONFIG.ringRadius);
-          const firstTurnId = d1 <= d2 ? localPlayer.id : remotePlayer?.id || localPlayer.id;
+          const { winner, d1, d2 } = resolveTossWinner(p1Pos, p2Pos);
+          const firstTurnId = winner === 'P1' ? localPlayer.id : remotePlayer?.id || localPlayer.id;
+          const resultPayload = {
+            firstTurnPlayerId: firstTurnId,
+            p1Distance: d1,
+            p2Distance: d2,
+            p1Position: p1Pos,
+            p2Position: p2Pos,
+          };
 
           // Broadcast toss result — KEEP matchPhase in TOSS_PHASE so target marbles don't spawn prematurely!
           useMultiplayerStore.setState({
@@ -243,14 +275,14 @@ export const MultiplayerGacoans: React.FC = () => {
             currentTurnPlayerId: firstTurnId,
             gacoanP1Pos: p1Pos,
             gacoanP2Pos: p2Pos,
-            tossResult: { firstTurnPlayerId: firstTurnId, p1Distance: d1, p2Distance: d2 },
-            tossBannerMessage: `🎉 ${d1 <= d2 ? localPlayer.name : remotePlayer?.name || 'Lawan'} LEBIH DEKAT (${d1.toFixed(2)}m vs ${d2.toFixed(2)}m)! GILIRAN PERTAMA!`,
+            tossResult: resultPayload,
+            tossBannerMessage: `🎉 ${winner === 'P1' ? localPlayer.name : remotePlayer?.name || 'Lawan'} LEBIH DEKAT (${d1.toFixed(2)}m vs ${d2.toFixed(2)}m)! GILIRAN PERTAMA!`,
           });
 
           import('../../services/peerService').then(({ peerService }) => {
             peerService.sendMessage({
               type: 'TOSS_RESULT',
-              payload: { firstTurnPlayerId: firstTurnId, p1Distance: d1, p2Distance: d2 },
+              payload: resultPayload,
             });
           });
 

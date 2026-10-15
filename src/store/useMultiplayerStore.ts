@@ -17,6 +17,41 @@ import { ARENA_CONFIG } from '../constants/physics.constants';
 export const INITIAL_P1_POS: [number, number, number] = [-0.25, ARENA_CONFIG.marbleRadius, 2.3];
 export const INITIAL_P2_POS: [number, number, number] = [0.25, ARENA_CONFIG.marbleRadius, 2.3];
 
+const PVP_SESSION_KEY = 'battle_of_marbles_pvp_session';
+
+export interface SavedPvPSession {
+  roomCode: string;
+  role: PlayerRole;
+  betAmount: number;
+  turnTimeLimitSeconds: number | null;
+  playerName: string;
+}
+
+export function getSavedPvPSession(): SavedPvPSession | null {
+  try {
+    const raw = sessionStorage.getItem(PVP_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePvPSession(session: SavedPvPSession): void {
+  try {
+    sessionStorage.setItem(PVP_SESSION_KEY, JSON.stringify(session));
+  } catch (e) {
+    console.warn('Failed to save pvp session', e);
+  }
+}
+
+export function clearPvPSession(): void {
+  try {
+    sessionStorage.removeItem(PVP_SESSION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 interface MultiplayerStoreState {
   isMultiplayerActive: boolean;
   roomStatus: RoomStatus;
@@ -66,8 +101,9 @@ interface MultiplayerStoreState {
   openLobbyModal: () => void;
   closeLobbyModal: () => void;
   setLocalPlayerName: (name: string) => void;
-  hostRoom: (betAmount?: number, timeLimit?: number | null) => Promise<void>;
+  hostRoom: (betAmount?: number, timeLimit?: number | null, customCode?: string) => Promise<string | null>;
   joinRoom: (code: string) => Promise<void>;
+  reconnectRoom: (code: string) => Promise<void>;
   leaveRoom: () => void;
   broadcastShot: (payload: ShotNetworkPayload) => void;
   broadcastTossShot: (payload: ShotNetworkPayload) => void;
@@ -214,6 +250,8 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
           matchPhase: 'TOSS_PHASE',
           currentTurnPlayerId: msg.payload.firstTurnPlayerId,
           tossResult: msg.payload,
+          gacoanP1Pos: msg.payload.p1Position,
+          gacoanP2Pos: msg.payload.p2Position,
           tossBannerMessage: `🎉 ${winnerName} LEBIH DEKAT! (${msg.payload.p1Distance.toFixed(2)}m vs ${msg.payload.p2Distance.toFixed(2)}m) — GILIRAN PERTAMA!`,
         });
 
@@ -388,22 +426,30 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }));
     },
 
-    hostRoom: async (betAmount = 5, timeLimit = 20) => {
+    hostRoom: async (betAmount = 5, timeLimit = 20, customCode?: string): Promise<string | null> => {
       const wallet = usePlayerWalletStore.getState();
       if (wallet.balance < betAmount) {
         set({
           errorMessage: `Kelerengmu tidak cukup (${wallet.balance} butir) untuk memasang taruhan ${betAmount} butir!`,
         });
-        return;
+        return null;
       }
 
-      const code = PeerService.generateRoomCode();
+      const code = (customCode || PeerService.generateRoomCode()).trim().toUpperCase();
       const hostPlayer: PlayerInfo = {
         ...DEFAULT_LOCAL_HOST,
         name: get().localPlayer.name || 'Jawara Biru',
       };
 
       const targetCount = betAmount * 2; // Setiap pemain menyetor betAmount, total di arena = 2x taruhan
+
+      savePvPSession({
+        roomCode: code,
+        role: 'HOST',
+        betAmount,
+        turnTimeLimitSeconds: timeLimit,
+        playerName: hostPlayer.name,
+      });
 
       set({
         isMultiplayerActive: true,
@@ -428,11 +474,13 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
 
       try {
         await peerService.createHost(code);
+        return code;
       } catch (err) {
         set({
           roomStatus: 'ERROR',
           errorMessage: 'Gagal membuat ruang tanding: ' + (err instanceof Error ? err.message : String(err)),
         });
+        return null;
       }
     },
 
@@ -447,6 +495,14 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
         ...DEFAULT_LOCAL_GUEST,
         name: get().localPlayer.name || 'Jawara Merah',
       };
+
+      savePvPSession({
+        roomCode: cleanCode,
+        role: 'GUEST',
+        betAmount: get().betAmount || 5,
+        turnTimeLimitSeconds: get().turnTimeLimitSeconds ?? 20,
+        playerName: guestPlayer.name,
+      });
 
       set({
         isMultiplayerActive: true,
@@ -474,7 +530,24 @@ export const useMultiplayerStore = create<MultiplayerStoreState>((set, get) => {
       }
     },
 
+    reconnectRoom: async (code: string) => {
+      const cleanCode = code.trim().toUpperCase();
+      if (!cleanCode) return;
+
+      const saved = getSavedPvPSession();
+      const currentRole = get().role || (saved?.roomCode === cleanCode ? saved.role : 'GUEST');
+
+      if (currentRole === 'HOST') {
+        const bet = saved?.betAmount ?? get().betAmount ?? 5;
+        const timer = saved?.turnTimeLimitSeconds !== undefined ? saved.turnTimeLimitSeconds : (get().turnTimeLimitSeconds ?? 20);
+        await get().hostRoom(bet, timer, cleanCode);
+      } else {
+        await get().joinRoom(cleanCode);
+      }
+    },
+
     leaveRoom: () => {
+      clearPvPSession();
       peerService.destroy();
       set({
         isMultiplayerActive: false,

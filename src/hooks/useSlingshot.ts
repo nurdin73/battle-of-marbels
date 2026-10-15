@@ -206,10 +206,10 @@ export function useSlingshot(
 
   const onPointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      // Only allow aiming when game is active (PLAYING)
-      if (currentScreen !== 'PLAYING') return;
-
       const multiplayerStore = useMultiplayerStore.getState();
+      // Only allow aiming when game is active (PLAYING) or multiplayer is active
+      if (currentScreen !== 'PLAYING' && !multiplayerStore.isMultiplayerActive) return;
+
       const isMultiplayerToss = multiplayerStore.isMultiplayerActive && multiplayerStore.matchPhase === 'TOSS_PHASE';
 
       // In non-toss phase, require aimingState to be strictly IDLE

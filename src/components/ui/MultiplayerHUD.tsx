@@ -2,10 +2,12 @@ import React from 'react';
 import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { useGameStore } from '../../store/useGameStore';
 import { usePlayerWalletStore } from '../../store/usePlayerWalletStore';
+import { useRouter } from '../../router';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 import { LogOut, RotateCcw, Trophy } from 'lucide-react';
 
 export const MultiplayerHUD: React.FC = () => {
+  const { navigate } = useRouter();
   const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
   const roomStatus = useMultiplayerStore((s) => s.roomStatus);
   const role = useMultiplayerStore((s) => s.role);
@@ -53,7 +55,13 @@ export const MultiplayerHUD: React.FC = () => {
     if (window.confirm('Yakin ingin keluar dari pertandingan multiplayer?')) {
       marbleAudio.playWoodKnockSound(0.9);
       leaveRoom();
+      navigate('/');
     }
+  };
+
+  const handleGameOverExit = () => {
+    leaveRoom();
+    navigate('/');
   };
 
   return (
@@ -413,7 +421,7 @@ export const MultiplayerHUD: React.FC = () => {
 
               <button
                 data-testid="multiplayer-exit-menu-btn"
-                onClick={leaveRoom}
+                onClick={handleGameOverExit}
                 className="w-full py-2.5 px-4 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-700 font-heading font-bold text-xs transition-all cursor-pointer"
               >
                 Kembali ke Menu Utama

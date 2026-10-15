@@ -67,6 +67,9 @@ export interface TossResultPayload {
   firstTurnPlayerId: string;
   p1Distance: number;
   p2Distance: number;
+  /** Host-authoritative final resting positions used to decide the winner. */
+  p1Position: [number, number, number];
+  p2Position: [number, number, number];
 }
 
 export type NetworkMessage =
