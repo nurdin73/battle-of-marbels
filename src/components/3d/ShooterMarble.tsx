@@ -13,6 +13,7 @@ import { useGameStore } from '../../store/useGameStore';
 import { useSlingshot } from '../../hooks/useSlingshot';
 import { marbleAudio } from '../../utils/soundSynth.utils';
 import { applyMagneticAttraction } from './targetPhysicsRegistry';
+import { GacoanTutorialHint } from './GacoanTutorialHint';
 
 const INITIAL_SHOOTER_POS: [number, number, number] = GAMEPLAY_CONFIG.foulResetPosition;
 const MARBLE_RED_TEAL_TEXTURE_URL = '/assets/textures/marble-red-teal.png';
@@ -36,6 +37,7 @@ export const ShooterMarble: React.FC = () => {
   const gacoanMaterial = useGameStore((s) => s.gacoanMaterial);
   const aimingState = useGameStore((s) => s.aimingState);
   const setAimingState = useGameStore((s) => s.setAimingState);
+  const gacoanCurrentPos = useGameStore((s) => s.gacoanCurrentPos);
   const updateGacoanPos = useGameStore((s) => s.updateGacoanPos);
   const triggerEvaluation = useGameStore((s) => s.triggerEvaluation);
   const evaluateTurnOutcome = useGameStore((s) => s.evaluateTurnOutcome);
@@ -479,6 +481,12 @@ export const ShooterMarble: React.FC = () => {
           />
         </mesh>
       </group>
+
+      {/* Signature Initial Game Tutorial Hint: Bounce Circles & Interactive Finger Swipe */}
+      <GacoanTutorialHint
+        position={gacoanCurrentPos}
+        marbleRadius={gacoanR}
+      />
 
       {/* Decoupled Floating 3D Identity Badge (Upright above marble with inverted triangle pointer) */}
       <group

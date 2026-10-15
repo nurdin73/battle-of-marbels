@@ -16,6 +16,7 @@ import {
   TOSS_WATCHDOG_SECONDS,
 } from './multiplayer-toss.utils';
 import { areAllTargetsAtRest } from './targetPhysicsRegistry';
+import { GacoanTutorialHint } from './GacoanTutorialHint';
 
 const P1_MARBLE_TEXTURE_URL = '/assets/textures/marble-blue-white.png';
 const P2_MARBLE_TEXTURE_URL = '/assets/textures/marble-red-teal.png';
@@ -732,6 +733,13 @@ export const MultiplayerGacoans: React.FC = () => {
           </div>
         </Html>
       </group>
+
+      {/* Signature Initial Game Tutorial Hint for Local Player Gacoan */}
+      <GacoanTutorialHint
+        position={isHost ? INITIAL_P1_POS : INITIAL_P2_POS}
+        marbleRadius={gacoanR}
+        visible={matchPhase === 'TOSS_PHASE' && (isHost ? !tossShotDoneP1 : !tossShotDoneP2) && aimingState === 'IDLE'}
+      />
     </>
   );
 };
