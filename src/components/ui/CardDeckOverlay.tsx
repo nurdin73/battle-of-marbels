@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCardStore, MAX_CHALK_ENERGY } from '../../store/useCardStore';
 import { useGameStore } from '../../store/useGameStore';
+import { useMultiplayerStore } from '../../store/useMultiplayerStore';
 import { X, Sparkles } from 'lucide-react';
 
 export const CardDeckOverlay: React.FC = () => {
@@ -10,12 +11,20 @@ export const CardDeckOverlay: React.FC = () => {
   const selectCard = useCardStore((s) => s.selectCard);
   const deselectCard = useCardStore((s) => s.deselectCard);
 
+  const isMultiplayerActive = useMultiplayerStore((s) => s.isMultiplayerActive);
+  const matchPhase = useMultiplayerStore((s) => s.matchPhase);
+
   const aimingState = useGameStore((s) => s.aimingState);
   const isInteracting =
     aimingState === 'AIMING' ||
     aimingState === 'CHARGING' ||
     aimingState === 'AIRBORNE' ||
     aimingState === 'SIMULATING';
+
+  // Power cards are strictly forbidden during multiplayer TOSS_PHASE (Lempar Niat)
+  if (isMultiplayerActive && matchPhase === 'TOSS_PHASE') {
+    return null;
+  }
 
   return (
     <div

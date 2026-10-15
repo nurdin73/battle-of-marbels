@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { TacticalCard } from '../types/card.types';
 import { cardService } from '../services/cardService';
+import { useMultiplayerStore } from './useMultiplayerStore';
 
 export const MAX_CHALK_ENERGY = 5;
 export const INITIAL_CHALK_ENERGY = 3;
@@ -30,6 +31,12 @@ export const useCardStore = create<CardStoreState>((set, get) => ({
   isDeckExpanded: true,
 
   selectCard: (id: string) => {
+    // Strictly forbid power card activation during multiplayer TOSS_PHASE
+    const mp = useMultiplayerStore.getState();
+    if (mp.isMultiplayerActive && mp.matchPhase === 'TOSS_PHASE') {
+      return false;
+    }
+
     const { chalkEnergy, handCards, activeCardId } = get();
 
     // Toggle off if already selected

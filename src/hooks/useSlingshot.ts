@@ -42,10 +42,17 @@ export function useSlingshot(
         ARENA_CONFIG.minImpulse +
         powerScale * (ARENA_CONFIG.maxImpulse - ARENA_CONFIG.minImpulse);
 
-      // Check for active tactical card modifiers
+      // Check for active tactical card modifiers (strictly disabled during multiplayer TOSS_PHASE)
+      const multiplayerStore = useMultiplayerStore.getState();
+      const isMultiplayerToss =
+        multiplayerStore.isMultiplayerActive &&
+        multiplayerStore.matchPhase === 'TOSS_PHASE';
+
       const cardStore = useCardStore.getState();
-      const activeCardId = cardStore.activeCardId;
-      const activeCard = cardStore.handCards.find((c) => c.id === activeCardId);
+      const activeCardId = isMultiplayerToss ? null : cardStore.activeCardId;
+      const activeCard = isMultiplayerToss
+        ? undefined
+        : cardStore.handCards.find((c) => c.id === activeCardId);
 
       let impulseMultiplier = 1.0;
       let distanceMultiplier = 1.0;

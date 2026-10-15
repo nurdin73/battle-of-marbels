@@ -51,7 +51,9 @@ export const SceneContainer: React.FC = () => {
             <PekaranganCornerGrass />
             <LevelObstacles />
             <BattlefieldHole />
-            <BattlefieldPebbles />
+            {(!isMultiplayerActive || matchPhase !== 'TOSS_PHASE') && (
+              <BattlefieldPebbles />
+            )}
             <CardBattlefieldEntities />
             <BattlefieldVFX />
 
