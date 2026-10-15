@@ -1,17 +1,31 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CylinderCollider, RapierRigidBody, RigidBody } from '@react-three/rapier';
+import { useTexture } from '@react-three/drei';
 import { marbleAudio } from '../../utils/soundSynth.utils';
+import { createPitDepthMask } from '../../utils/pitTexture.utils';
 
-interface BattlefieldHoleProps {
-  position?: [number, number, number];
-  radius?: number;
+const GROUND_TEXTURE_URL = '/assets/textures/ground.webp';
+useTexture.preload(GROUND_TEXTURE_URL);
+
+export interface PitHoleConfig {
+  id: string;
+  position: [number, number, number];
+  radius: number;
 }
 
-export const BattlefieldHole: React.FC<BattlefieldHoleProps> = ({
-  position = [1.35, 0, 0.5],
-  radius = 0.22,
+interface SingleHoleProps {
+  config: PitHoleConfig;
+  groundTexture: THREE.Texture;
+  depthMaskTexture: THREE.CanvasTexture;
+}
+
+const SingleBattlefieldHole: React.FC<SingleHoleProps> = ({
+  config,
+  groundTexture,
+  depthMaskTexture,
 }) => {
+  const { position, radius } = config;
   const lastSoundPlayedRef = useRef<number>(0);
 
   const handleIntersectionEnter = (event: { other: { rigidBody?: RapierRigidBody | null } }) => {
@@ -48,8 +62,29 @@ export const BattlefieldHole: React.FC<BattlefieldHoleProps> = ({
     }
   };
 
+  // Tiny flat natural pebbles sitting half-buried along the rim
+  const rimPebbles = useMemo(() => {
+    const count = 4;
+    const items: Array<{ x: number; z: number; scale: [number, number, number]; color: string; rotY: number }> = [];
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + Math.sin(i * 1.7) * 0.35;
+      const dist = radius * (0.85 + Math.random() * 0.18);
+      items.push({
+        x: Math.cos(angle) * dist,
+        z: Math.sin(angle) * dist,
+        scale: [0.009 + Math.random() * 0.004, 0.004, 0.011 + Math.random() * 0.005],
+        color: i % 2 === 0 ? '#8c7d70' : '#736357',
+        rotY: Math.random() * Math.PI,
+      });
+    }
+    return items;
+  }, [radius]);
+
+  // Plane size with seamless feathering margins
+  const planeSize = radius * 2.8;
+
   return (
-    <group position={position} name="battlefield-hole">
+    <group position={position} name={`battlefield-hole-${config.id}`}>
       {/* Rapier Physics Sensor: Detects rolling marbles entering the pit trap */}
       <RigidBody type="fixed" colliders={false}>
         <CylinderCollider
@@ -60,35 +95,127 @@ export const BattlefieldHole: React.FC<BattlefieldHoleProps> = ({
         />
       </RigidBody>
 
-      {/* Visual: Outer raised earthy soil ring berm */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
-        <ringGeometry args={[radius * 0.82, radius * 1.35, 32]} />
+      {/* 1. Base Layer: ground.webp texture with warm light-brown earth tint */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow>
+        <planeGeometry args={[planeSize, planeSize]} />
         <meshStandardMaterial
-          color="#5c3a21"
-          roughness={0.96}
+          map={groundTexture}
+          alphaMap={depthMaskTexture}
+          color="#ba8252" // Warm light-brown soil tint
+          transparent
+          opacity={0.88}
+          depthWrite={false}
+          roughness={0.92}
           metalness={0.02}
+        />
+      </mesh>
+
+      {/* 2. Soft Shadow Layer: Natural warm clay shading without harsh pitch-black void */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
+        <planeGeometry args={[planeSize, planeSize]} />
+        <meshBasicMaterial
+          map={depthMaskTexture}
+          transparent
+          opacity={0.75}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* 3. Gentle 3D Cavity Slope: Inverted truncated cone textured with warm brown ground.webp */}
+      <mesh position={[0, -0.014, 0]}>
+        <cylinderGeometry args={[radius * 0.42, 0.02, 0.028, 24, 1, true]} />
+        <meshStandardMaterial
+          map={groundTexture}
+          color="#754321" // Warm medium-brown soil depth
+          roughness={0.96}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Visual: Deep dark recessed pit center */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <circleGeometry args={[radius * 0.82, 32]} />
-        <meshBasicMaterial color="#170c04" />
+      {/* 4. Pit bottom floor disk in warm earthen clay */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.027, 0]}>
+        <circleGeometry args={[radius * 0.18, 16]} />
+        <meshBasicMaterial color="#542e14" />
       </mesh>
 
-      {/* Traditional rustic bamboo marker peg ("Pancang Eak") */}
-      <group position={[radius * 1.15, 0, 0]} rotation={[0.04, 0.2, -0.06]}>
-        <mesh position={[0, 0.16, 0]} castShadow>
-          <cylinderGeometry args={[0.012, 0.014, 0.32, 6]} />
-          <meshStandardMaterial color="#854d0e" roughness={0.85} />
+      {/* 5. Natural tiny flat pebbles embedded along the rim */}
+      {rimPebbles.map((p, idx) => (
+        <mesh
+          key={`rim-peb-${idx}`}
+          position={[p.x, 0.003, p.z]}
+          rotation={[0, p.rotY, 0]}
+          scale={p.scale}
+          castShadow
+          receiveShadow
+        >
+          <sphereGeometry args={[1, 7, 7]} />
+          <meshStandardMaterial color={p.color} roughness={0.9} />
         </mesh>
-        {/* Red cloth pennant flag ("Bendera Eak") */}
-        <mesh position={[0.045, 0.28, 0]}>
-          <planeGeometry args={[0.08, 0.05]} />
-          <meshStandardMaterial color="#dc2626" roughness={0.7} side={THREE.DoubleSide} />
-        </mesh>
-      </group>
+      ))}
+    </group>
+  );
+};
+
+// Strategic layout of traditional playing pits across the battlefield
+export const DEFAULT_BATTLEFIELD_HOLES: PitHoleConfig[] = [
+  {
+    // Lubang Utama Timur: Primary traditional target pit
+    id: 'pit-primary-east',
+    position: [1.35, 0, 0.5],
+    radius: 0.22,
+  },
+  {
+    // Lubang Barat Daya: Flanking hazard guarding the western approach
+    id: 'pit-west-flank',
+    position: [-1.4, 0, 1.05],
+    radius: 0.19,
+  },
+  {
+    // Lubang Utara: Tactical perimeter pit behind the target cluster
+    id: 'pit-north-rear',
+    position: [0.35, 0, -1.35],
+    radius: 0.20,
+  },
+];
+
+interface BattlefieldHoleProps {
+  holes?: PitHoleConfig[];
+}
+
+export const BattlefieldHole: React.FC<BattlefieldHoleProps> = ({
+  holes = DEFAULT_BATTLEFIELD_HOLES,
+}) => {
+  const groundTextureRaw = useTexture(GROUND_TEXTURE_URL);
+
+  const groundTexture = useMemo(() => {
+    const tex = groundTextureRaw.clone();
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1.5, 1.5);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, [groundTextureRaw]);
+
+  const depthMaskTexture = useMemo(() => createPitDepthMask(512), []);
+
+  useEffect(() => {
+    return () => {
+      groundTexture.dispose();
+      depthMaskTexture.dispose();
+    };
+  }, [groundTexture, depthMaskTexture]);
+
+  return (
+    <group name="battlefield-holes-cluster">
+      {holes.map((hole) => (
+        <SingleBattlefieldHole
+          key={hole.id}
+          config={hole}
+          groundTexture={groundTexture}
+          depthMaskTexture={depthMaskTexture}
+        />
+      ))}
     </group>
   );
 };

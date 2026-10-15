@@ -169,8 +169,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   flickCount: 0,
   turnCount: 1,
   comboStreak: 0,
-  turnTimeLimitSeconds: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-  turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
+  turnTimeLimitSeconds: null,
+  turnTimer: null,
   isTimerActive: false,
   isGameOver: false,
   starsAwarded: 0,
@@ -228,7 +228,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   startMatchWithMarbleCount: (count: number, timeLimit?: number | null) => {
     useCardStore.getState().resetCardStore();
     const targets = createTargetMarblesByCount(count);
-    const effectiveLimit = timeLimit !== undefined ? timeLimit : get().turnTimeLimitSeconds;
+    const effectiveLimit = timeLimit !== undefined ? timeLimit : null;
     set((state) => ({
       customMarbleCount: count,
       targetMarbles: targets,
@@ -519,8 +519,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       flickCount: 0,
       turnCount: 1,
       comboStreak: 0,
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: true,
+      turnTimer: state.turnTimeLimitSeconds,
+      isTimerActive: state.turnTimeLimitSeconds !== null,
       isGameOver: false,
       starsAwarded: 0,
       lastTurnOutcome: null,
@@ -546,8 +546,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       foulRestoreRevision: 0,
       score: 0,
       comboStreak: 0,
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: true,
+      turnTimer: state.turnTimeLimitSeconds,
+      isTimerActive: state.turnTimeLimitSeconds !== null,
       lastTurnOutcome: null,
       targetsPocketedThisTurn: 0,
       resetRevision: state.resetRevision + 1,
@@ -573,8 +573,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       flickCount: 0,
       turnCount: 1,
       comboStreak: 0,
-      turnTimer: GAMEPLAY_CONFIG.turnTimeLimitSeconds,
-      isTimerActive: true,
+      turnTimer: state.turnTimeLimitSeconds,
+      isTimerActive: state.turnTimeLimitSeconds !== null,
       isGameOver: false,
       starsAwarded: 0,
       lastTurnOutcome: null,
